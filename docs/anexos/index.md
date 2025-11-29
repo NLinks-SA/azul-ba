@@ -5,8 +5,10 @@ Información complementaria para la implementación.
 ## Contenido
 
 1. [Glosario de Términos](glosario.md)
-2. [Troubleshooting](troubleshooting.md)
-3. [Script de Automatización](script.md)
+2. [Matriz RACI](raci.md) - Responsabilidades por rol
+3. [Diagramas BPMN](bpmn.md) - Flujos de proceso
+4. [Troubleshooting](troubleshooting.md)
+5. [Script de Automatización](script.md)
 
 ---
 

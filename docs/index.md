@@ -66,6 +66,11 @@ Al finalizar esta configuración, el sistema operará así:
           ▼
 6. ENTREGA
    └── Despacho al cliente
+          │
+          ▼
+7. FACTURACIÓN
+   ├── Factura al cliente
+   └── Validación facturas proveedores (3-way + QC)
 ```
 
 ---
@@ -79,7 +84,8 @@ Al finalizar esta configuración, el sistema operará así:
 | [**Parte 3**](parte3/index.md) | Manufactura - Work Centers y BoMs |
 | [**Parte 4**](parte4/index.md) | Control de Calidad |
 | [**Parte 5**](parte5/index.md) | Flujo Operativo - Prueba completa |
-| [**Anexos**](anexos/index.md) | Glosario, Troubleshooting, Script |
+| [**Parte 6**](parte6/index.md) | Facturación - Cliente y proveedores |
+| [**Anexos**](anexos/index.md) | RACI, BPMN, Glosario, Troubleshooting, Script |
 
 ---
 

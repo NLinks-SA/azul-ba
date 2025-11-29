@@ -67,9 +67,16 @@ nav:
     - Recepciones y QC: parte5/03-recepciones.md
     - Producción y Entrega: parte5/04-produccion.md
 
+  - "Parte 6: Facturación":
+    - parte6/index.md
+    - Facturación Cliente: parte6/01-factura-cliente.md
+    - Facturas Proveedores: parte6/02-factura-proveedores.md
+
   - Anexos:
     - anexos/index.md
     - Glosario: anexos/glosario.md
+    - Matriz RACI: anexos/raci.md
+    - Diagramas BPMN: anexos/bpmn.md
     - Troubleshooting: anexos/troubleshooting.md
     - Script Automático: anexos/script.md
 
