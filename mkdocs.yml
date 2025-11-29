@@ -1,0 +1,96 @@
+site_name: Guía Odoo - Manufactura con Subcontratación MTO
+site_description: Guía paso a paso para configurar manufactura compleja con subcontratación multietapa, MTO y control de calidad
+site_author: Azul BA
+site_url: https://azulba.github.io/odoo-manufactura-guia/
+
+theme:
+  name: material
+  language: es
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Modo oscuro
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Modo claro
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+nav:
+  - Inicio: index.md
+
+  - "Parte 1: Preparación":
+    - parte1/index.md
+    - Aplicaciones a Instalar: parte1/01-aplicaciones.md
+    - Configuración Inventario: parte1/02-config-inventario.md
+    - Configuración Compras: parte1/03-config-compras.md
+    - Configuración Manufactura: parte1/04-config-manufactura.md
+    - Configuración Calidad: parte1/05-config-calidad.md
+    - Configuración Ventas: parte1/06-config-ventas.md
+
+  - "Parte 2: Datos Maestros":
+    - parte2/index.md
+    - Proveedores: parte2/01-proveedores.md
+    - Atributos de Producto: parte2/02-atributos.md
+    - Productos Componentes: parte2/03-productos-componentes.md
+    - Producto Final: parte2/04-producto-final.md
+
+  - "Parte 3: Manufactura":
+    - parte3/index.md
+    - Work Centers: parte3/01-work-centers.md
+    - BoM Normal: parte3/02-bom-normal.md
+    - BoM Subcontratación: parte3/03-bom-subcontratacion.md
+    - Operaciones y Routings: parte3/04-operaciones.md
+
+  - "Parte 4: Calidad":
+    - parte4/index.md
+    - Control Points Recepción: parte4/01-qc-recepcion.md
+    - Control Points Manufactura: parte4/02-qc-manufactura.md
+
+  - "Parte 5: Flujo Operativo":
+    - parte5/index.md
+    - Crear Venta: parte5/01-crear-venta.md
+    - Proceso MO y POs: parte5/02-mo-pos.md
+    - Recepciones y QC: parte5/03-recepciones.md
+    - Producción y Entrega: parte5/04-produccion.md
+
+  - Anexos:
+    - anexos/index.md
+    - Glosario: anexos/glosario.md
+    - Troubleshooting: anexos/troubleshooting.md
+    - Script Automático: anexos/script.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - attr_list
+  - md_in_html
+  - tables
+  - def_list
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+
+extra:
+  generator: false
