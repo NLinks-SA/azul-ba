@@ -1092,25 +1092,28 @@ else:
     })
     print(f"  + Mesa creada (ID: {mesa_tmpl_id})")
 
-    for attr_name in ['Material Tapa', 'Material Base', 'Medidas']:
+    # Orden de atributos: Material Tapa → Terminación → Material Base → Medidas
+    # Terminación va después de Material Tapa para mejor UX (las exclusiones filtran opciones)
+    atributos_orden = [
+        ('Material Tapa', 10),
+        ('Terminación', 20),  # Justo después del material para ver opciones filtradas
+        ('Material Base', 30),
+        ('Medidas', 40),
+    ]
+
+    for attr_name, sequence in atributos_orden:
         attr_id = ATRIBUTOS[attr_name]
-        values = [v for k, v in ATTR_VALUES.items() if k.startswith(f"{attr_name}|")]
+        if attr_name == 'Terminación':
+            values = [ATTR_VALUES[f"Terminación|{t['nombre']}"] for t in TERMINACIONES_MESA]
+        else:
+            values = [v for k, v in ATTR_VALUES.items() if k.startswith(f"{attr_name}|")]
         create('product.template.attribute.line', {
             'product_tmpl_id': mesa_tmpl_id,
             'attribute_id': attr_id,
             'value_ids': [(6, 0, values)],
+            'sequence': sequence,
         })
-        print(f"    -> Atributo: {attr_name}")
-
-    # Agregar atributo Terminación a Mesa
-    attr_id = ATRIBUTOS['Terminación']
-    term_values = [ATTR_VALUES[f"Terminación|{t['nombre']}"] for t in TERMINACIONES_MESA]
-    create('product.template.attribute.line', {
-        'product_tmpl_id': mesa_tmpl_id,
-        'attribute_id': attr_id,
-        'value_ids': [(6, 0, term_values)],
-    })
-    print(f"    -> Atributo: Terminación (Sin Terminación + 3 lustres)")
+        print(f"    -> Atributo: {attr_name} (seq: {sequence})")
 
 # Asegurar rutas Manufacture + MTO (fabricación bajo pedido)
 write('product.template', [mesa_tmpl_id], {
@@ -1123,6 +1126,70 @@ mesa_variantes = search_read('product.product',
     ['id', 'display_name', 'product_template_variant_value_ids']
 )
 print(f"\n  Total variantes de Mesa: {len(mesa_variantes)}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9.1 EXCLUSIONES DE ATRIBUTOS (Terminación solo visible para Madera)
+# ═══════════════════════════════════════════════════════════════════════════════
+print("\n  Configurando exclusiones de atributos...")
+
+# Obtener los product.template.attribute.value (PTAV) para Mesa
+mesa_ptavs = search_read('product.template.attribute.value',
+    [['product_tmpl_id', '=', mesa_tmpl_id]],
+    ['id', 'name', 'attribute_id', 'product_attribute_value_id']
+)
+
+# Mapear PTAV por nombre de atributo|valor
+ptav_map = {}
+for ptav in mesa_ptavs:
+    attr_name = ptav['attribute_id'][1] if ptav['attribute_id'] else ''
+    key = f"{attr_name}|{ptav['name']}"
+    ptav_map[key] = ptav['id']
+
+# Definir exclusiones:
+# - Mármol/Neolith excluyen terminaciones con lustre
+# - Madera excluye "Sin Terminación"
+exclusiones = [
+    # Material Tapa -> excluye estas Terminaciones
+    ('Material Tapa|Mármol Carrara', ['Terminación|Lustre Mate', 'Terminación|Lustre Brillante', 'Terminación|Natural']),
+    ('Material Tapa|Neolith Negro', ['Terminación|Lustre Mate', 'Terminación|Lustre Brillante', 'Terminación|Natural']),
+    ('Material Tapa|Madera Paraíso', ['Terminación|Sin Terminación']),
+]
+
+exclusiones_creadas = 0
+for material_key, terminaciones_excluir in exclusiones:
+    material_ptav_id = ptav_map.get(material_key)
+    if not material_ptav_id:
+        continue
+
+    # Obtener IDs de terminaciones a excluir
+    term_ids = [ptav_map.get(t) for t in terminaciones_excluir if ptav_map.get(t)]
+    if not term_ids:
+        continue
+
+    # Verificar si ya existe esta exclusión
+    existing = search_read('product.template.attribute.exclusion',
+        [['product_tmpl_id', '=', mesa_tmpl_id],
+         ['product_template_attribute_value_id', '=', material_ptav_id]],
+        ['id', 'value_ids']
+    )
+
+    if existing:
+        # Actualizar exclusión existente
+        write('product.template.attribute.exclusion', [existing[0]['id']], {
+            'value_ids': [(6, 0, term_ids)]
+        })
+    else:
+        # Crear nueva exclusión
+        create('product.template.attribute.exclusion', {
+            'product_tmpl_id': mesa_tmpl_id,
+            'product_template_attribute_value_id': material_ptav_id,
+            'value_ids': [(6, 0, term_ids)],
+        })
+    exclusiones_creadas += 1
+
+print(f"    -> {exclusiones_creadas} exclusiones configuradas")
+print("    -> Mármol/Neolith: solo 'Sin Terminación' disponible")
+print("    -> Madera: solo terminaciones de lustre disponibles")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 10. BoMs PARA MESA
