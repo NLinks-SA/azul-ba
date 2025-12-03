@@ -93,9 +93,9 @@ Click en **Nuevo**
 
 ---
 
-## 2.4 Crear Atributo: Terminación (para Tapas Madera)
+## 2.4 Crear Atributo: Terminación
 
-Este atributo es solo para las tapas de madera que tienen diferentes terminaciones.
+Este atributo se usa tanto para las tapas de madera terminadas como para la Mesa final.
 
 Click en **Nuevo**
 
@@ -109,11 +109,16 @@ Click en **Nuevo**
 
 ### Valores del Atributo
 
-| Valor | Es personalizado |
-|-------|------------------|
-| Lustre Mate | No |
-| Lustre Brillante | No |
-| Natural | No |
+| Valor | Es personalizado | Uso |
+|-------|------------------|-----|
+| Sin Terminación | No | Para Mármol/Neolith (sin lustrar) |
+| Lustre Mate | No | Para Madera |
+| Lustre Brillante | No | Para Madera |
+| Natural | No | Para Madera |
+
+!!! info "Combinaciones Válidas en Mesa"
+    - **Mármol/Neolith + Sin Terminación**: Las tapas de piedra no llevan lustre
+    - **Madera + Lustre (Mate/Brillante/Natural)**: Las tapas de madera requieren terminación
 
 **Guardar**
 
@@ -149,13 +154,21 @@ Inventario → Configuración → Atributos
 | Material Tapa | 3 (Mármol, Neolith, Madera) | Instantáneamente |
 | Material Base | 2 (Negro, Dorado) | Instantáneamente |
 | Medidas | 2 (180x90, 220x100) | Instantáneamente |
-| Terminación | 3 (Mate, Brillante, Natural) | Instantáneamente |
+| Terminación | 4 (Sin Terminación, Mate, Brillante, Natural) | Instantáneamente |
 
 ### Cálculo de Variantes
 
-Para la Mesa:
+Para la Mesa (todas las combinaciones):
 ```
-3 (tapas) × 2 (bases) × 2 (medidas) = 12 variantes
+3 (tapas) × 2 (bases) × 2 (medidas) × 4 (terminaciones) = 48 variantes
+```
+
+Combinaciones válidas con BoM:
+```
+Mármol/Neolith + Sin Terminación: 2 × 2 × 2 × 1 = 8 variantes
+Madera + Lustre:                  1 × 2 × 2 × 3 = 12 variantes
+─────────────────────────────────────────────────────────────
+Total con BoM:                                    20 variantes
 ```
 
 Para Tapa Madera Terminada (por tamaño):
@@ -172,4 +185,4 @@ Para Tapa Madera Terminada (por tamaño):
 | Material Tapa | 3 | Mesa |
 | Material Base | 2 | Mesa |
 | Medidas | 2 | Mesa, Tapas, Bases |
-| Terminación | 3 | Tapa Madera Terminada |
+| Terminación | 4 | Mesa, Tapa Madera Terminada |

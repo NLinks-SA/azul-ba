@@ -38,19 +38,28 @@ Inventario → Productos → Productos → Nuevo
 
 ### Pestaña: Atributos y Variantes
 
-Agregar tres líneas de atributos:
+Agregar cuatro líneas de atributos:
 
 | Atributo | Valores a seleccionar |
 |----------|----------------------|
 | Material Tapa | Mármol Carrara, Neolith Negro, Madera Paraíso |
 | Material Base | Acero Negro, Acero Dorado |
 | Medidas | 180x90 cm, 220x100 cm |
+| Terminación | Sin Terminación, Lustre Mate, Lustre Brillante, Natural |
 
 Al guardar, Odoo crea automáticamente:
 
 ```
-3 × 2 × 2 = 12 variantes
+3 × 2 × 2 × 4 = 48 variantes
 ```
+
+!!! warning "Combinaciones Válidas"
+    No todas las 48 variantes tienen BoM. Solo se fabrican:
+
+    - **Mármol/Neolith + Sin Terminación** (8 variantes)
+    - **Madera + Lustre** (12 variantes)
+
+    Total con BoM: **20 variantes**
 
 ---
 
@@ -83,22 +92,22 @@ Click en **Guardar**
 
 Después de guardar, aparece un botón **Variantes** (o un número indicando la cantidad).
 
-Click para ver las 12 variantes:
+Click para ver las 48 variantes. Ejemplos de **variantes con BoM**:
 
-| Variante | Combinación |
-|----------|-------------|
-| 1 | Mármol Carrara + Acero Negro + 180x90 |
-| 2 | Mármol Carrara + Acero Negro + 220x100 |
-| 3 | Mármol Carrara + Acero Dorado + 180x90 |
-| 4 | Mármol Carrara + Acero Dorado + 220x100 |
-| 5 | Neolith Negro + Acero Negro + 180x90 |
-| 6 | Neolith Negro + Acero Negro + 220x100 |
-| 7 | Neolith Negro + Acero Dorado + 180x90 |
-| 8 | Neolith Negro + Acero Dorado + 220x100 |
-| 9 | Madera Paraíso + Acero Negro + 180x90 |
-| 10 | Madera Paraíso + Acero Negro + 220x100 |
-| 11 | Madera Paraíso + Acero Dorado + 180x90 |
-| 12 | Madera Paraíso + Acero Dorado + 220x100 |
+| # | Combinación (con BoM) |
+|---|----------------------|
+| 1 | Mármol Carrara + Acero Negro + 180x90 + Sin Terminación |
+| 2 | Mármol Carrara + Acero Dorado + 220x100 + Sin Terminación |
+| 3 | Neolith Negro + Acero Negro + 180x90 + Sin Terminación |
+| 4 | Neolith Negro + Acero Dorado + 220x100 + Sin Terminación |
+| 5 | Madera Paraíso + Acero Negro + 180x90 + Lustre Mate |
+| 6 | Madera Paraíso + Acero Negro + 180x90 + Lustre Brillante |
+| 7 | Madera Paraíso + Acero Negro + 180x90 + Natural |
+| 8 | Madera Paraíso + Acero Dorado + 220x100 + Lustre Mate |
+| ... | ... |
+
+!!! info "Variantes sin BoM"
+    Las combinaciones inválidas (ej: Mármol + Lustre, Madera + Sin Terminación) existen como variantes pero no tienen BoM asignada, por lo que no se pueden fabricar.
 
 ---
 
@@ -134,7 +143,7 @@ Inventario → Productos → Productos
 
 | Producto | Tipo | Rutas | Variantes |
 |----------|------|-------|-----------|
-| Mesa Comedor Premium | Almacenable | Manufacture + MTO | 12 |
+| Mesa Comedor Premium | Almacenable | Manufacture + MTO | 48 (20 con BoM) |
 | Base Acero Negro 180x90 | Almacenable | Buy + MTO | - |
 | Base Acero Negro 220x100 | Almacenable | Buy + MTO | - |
 | Base Acero Dorado 180x90 | Almacenable | Buy + MTO | - |
@@ -161,8 +170,11 @@ Verificar en cada componente que tenga proveedor configurado en la pestaña **Co
 | Proveedores | 5 |
 | Atributos | 4 |
 | Productos componente | 12 |
-| Producto final | 1 (con 12 variantes) |
-| **Total variantes** | **18** |
+| Producto final | 1 (48 variantes, 20 con BoM) |
+| **Total variantes** | **54** |
+
+!!! tip "Orderpoints para Tapas Sin Terminar"
+    Las Tapas Madera Sin Terminar tienen **reglas de reabastecimiento (orderpoints)** configuradas para generar PO automática a Carpintería cuando se necesitan para la producción de Tapas Terminadas.
 
 ---
 

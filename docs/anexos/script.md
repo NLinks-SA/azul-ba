@@ -4,7 +4,7 @@ Script Python para automatizar toda la configuración del demo.
 
 ## Descripción
 
-El script `setup_demo_completo.py` automatiza:
+El script `setup.py` automatiza:
 
 - Configuración del sistema
 - Creación de proveedores
@@ -12,6 +12,7 @@ El script `setup_demo_completo.py` automatiza:
 - Creación de BoMs
 - Creación de Work Centers
 - Creación de Control Points de calidad
+- Reglas de reabastecimiento (orderpoints) para PO automáticas
 - Orden de demo para verificar el flujo
 
 ---
@@ -30,7 +31,7 @@ El script `setup_demo_completo.py` automatiza:
 ### Ejecución Normal
 
 ```bash
-python setup_demo_completo.py
+python setup.py
 ```
 
 Crea toda la configuración sin eliminar datos existentes.
@@ -38,7 +39,7 @@ Crea toda la configuración sin eliminar datos existentes.
 ### Limpiar y Recrear
 
 ```bash
-python setup_demo_completo.py --limpiar
+python setup.py --limpiar
 ```
 
 Elimina los datos de demo anteriores y los recrea.
@@ -47,60 +48,75 @@ Elimina los datos de demo anteriores y los recrea.
 
 ## Configuración
 
-Al inicio del script, configurar las credenciales:
+Crear archivo `config.py` con las credenciales (copiar de `config.example.py`):
 
 ```python
-# === CONFIGURACIÓN ===
-URL = "http://localhost:8069"    # URL de Odoo
-DB = "odoo_demo"                 # Nombre de la base de datos
-USER = "admin"                   # Usuario
-PASSWORD = "admin"               # Contraseña
+# config.py
+ODOO_URL = "https://tu-instancia.odoo.com"
+ODOO_DB = "nombre_base_datos"
+ODOO_USERNAME = "admin"
+ODOO_PASSWORD = "tu_password"
 ```
+
+!!! warning "Seguridad"
+    El archivo `config.py` está en `.gitignore` para no exponer credenciales.
 
 ---
 
 ## Estructura del Script
 
 ```
-setup_demo_completo.py
+setup.py
 │
 ├── Sección 0: Configuración Avanzada
 │   ├── Multi-step routes
 │   ├── Ubicaciones de subcontratista
-│   └── Ubicaciones de tránsito
+│   ├── Ubicaciones de tránsito
+│   └── Picking Type "Envío a Lustrador" + Ruta resupply
 │
-├── Sección 1: Proveedores
+├── Sección 1: Datos Base
+│   ├── Rutas (MTO, Buy, Manufacture)
+│   └── Categorías de productos
+│
+├── Sección 2: Proveedores
 │   └── 5 proveedores con ubicaciones
 │
-├── Sección 2: Atributos
+├── Sección 3: Clientes
+│   └── 2 clientes demo
+│
+├── Sección 4: Atributos
 │   └── 4 atributos con valores
+│       ├── Material Tapa (3 valores)
+│       ├── Material Base (2 valores)
+│       ├── Medidas (2 valores)
+│       └── Terminación (4 valores incl. Sin Terminación)
 │
-├── Sección 3: Categorías
-│   └── Categoría "Muebles"
-│
-├── Sección 4-7: Productos
-│   ├── Tapas sin terminar
-│   ├── Tapas terminadas (variantes)
-│   ├── Tapas mármol/neolith
-│   └── Bases metálicas
-│
-├── Sección 8: Producto Final
-│   └── Mesa Comedor Premium (12 variantes)
-│
-├── Sección 9: Work Centers
+├── Sección 5: Work Centers
 │   └── 6 centros de trabajo
 │
-├── Sección 10: BoMs Normales
-│   └── 12 BoMs de Mesa
+├── Sección 6: Bases Metálicas
+│   └── 4 productos con BoM subcontratación
 │
-├── Sección 11: BoMs Subcontratación
-│   └── 10 BoMs
+├── Sección 7: Tapas Mármol/Neolith
+│   └── 4 productos con BoM subcontratación
 │
-├── Sección 12: Control de Calidad
+├── Sección 8: Tapas de Madera
+│   ├── Tapas Sin Terminar (2 productos + orderpoints + ruta resupply)
+│   └── Tapas Terminadas (6 variantes con BoM)
+│
+├── Sección 9: Producto Final
+│   └── Mesa Comedor Premium
+│       ├── 48 variantes totales
+│       └── 20 con BoM (combinaciones válidas)
+│
+├── Sección 10: BoMs Mesa
+│   └── 20 BoMs con operaciones
+│
+├── Sección 11: Control de Calidad
 │   └── 6 Control Points
 │
-└── Sección 13: Orden de Demo
-    └── SO + confirmación
+└── Sección 12: Orden de Demo
+    └── SO para verificar flujo
 ```
 
 ---
@@ -178,7 +194,8 @@ def get_route(route_name):
 El script completo está disponible en el repositorio:
 
 ```
-/setup_demo_completo.py
+/setup.py
+/config.example.py
 ```
 
 ---

@@ -104,6 +104,14 @@ TERMINACIONES = [
     {'nombre': 'Natural', 'costo_adicional': 40},
 ]
 
+# Terminaciones para Mesa (incluye opción para no-madera)
+TERMINACIONES_MESA = [
+    {'nombre': 'Sin Terminación', 'costo_adicional': 0, 'aplica_madera': False},
+    {'nombre': 'Lustre Mate', 'costo_adicional': 60, 'aplica_madera': True},
+    {'nombre': 'Lustre Brillante', 'costo_adicional': 80, 'aplica_madera': True},
+    {'nombre': 'Natural', 'costo_adicional': 40, 'aplica_madera': True},
+]
+
 MATERIALES_TAPA = [
     {
         'nombre': 'Mármol Carrara',
@@ -329,6 +337,34 @@ if '--limpiar' in sys.argv:
         execute('quality.point', 'unlink', [qc_points])
         print(f"  {len(qc_points)} quality points eliminados")
 
+    # Eliminar Orderpoints de demo (Tapas Sin Terminar)
+    orderpoints = search('stock.warehouse.orderpoint', [['product_id.name', 'ilike', 'Tapa Madera Sin Terminar%']])
+    if orderpoints:
+        execute('stock.warehouse.orderpoint', 'unlink', [orderpoints])
+        print(f"  {len(orderpoints)} orderpoints eliminados")
+
+    # Eliminar ruta y reglas de Resupply Lustrador
+    resupply_routes = search('stock.route', [['name', 'ilike', 'Resupply Lustrador%']])
+    if resupply_routes:
+        # Primero eliminar las reglas
+        rules = search('stock.rule', [['route_id', 'in', resupply_routes]])
+        if rules:
+            execute('stock.rule', 'unlink', [rules])
+        execute('stock.route', 'unlink', [resupply_routes])
+        print(f"  {len(resupply_routes)} rutas de resupply eliminadas")
+
+    # Eliminar Picking Type de Envío a Lustrador
+    lustrador_pt = search('stock.picking.type', [['name', 'ilike', '%Envío a Lustrador%']])
+    if lustrador_pt:
+        execute('stock.picking.type', 'unlink', [lustrador_pt])
+        print(f"  {len(lustrador_pt)} picking types eliminados")
+
+    # Eliminar secuencias de Lustrador
+    lust_seq = search('ir.sequence', [['code', '=', 'stock.picking.lustrador']])
+    if lust_seq:
+        execute('ir.sequence', 'unlink', [lust_seq])
+        print(f"  {len(lust_seq)} secuencias eliminadas")
+
     # Eliminar ubicaciones de subcontratación y tránsito creadas
     custom_locs = search('stock.location', [
         '|',
@@ -418,13 +454,86 @@ transit_locs = [
     ('TR-META-FAB', 'Transit: Metalúrgica → Fábrica'),
     ('TR-MARM-FAB', 'Transit: Marmolería → Fábrica'),
 ]
+TRANSIT_LOCATIONS = {}
 for code, name in transit_locs:
     loc_id, created = get_or_create('stock.location',
         [['name', '=', name]],
         {'name': name, 'usage': 'transit', 'location_id': TRANSIT_PARENT_ID, 'barcode': code}
     )
+    TRANSIT_LOCATIONS[code] = loc_id
     if created:
         print(f"      + {name}")
+
+# 0.4 Picking Type y Ruta para transferencias visibles a Lustrador
+print("\n  0.4 Configurando transferencias visibles a subcontratistas...")
+
+# Obtener datos del almacén
+wh_data = search_read('stock.warehouse', [], ['id', 'code', 'lot_stock_id', 'int_type_id'])
+WH_ID = wh_data[0]['id'] if wh_data else 1
+WH_CODE = wh_data[0]['code'] if wh_data else 'WH'
+WH_STOCK_LOC = wh_data[0]['lot_stock_id'][0] if wh_data and wh_data[0]['lot_stock_id'] else 1
+WH_INT_TYPE = wh_data[0]['int_type_id'][0] if wh_data and wh_data[0]['int_type_id'] else None
+
+# Crear Picking Type para envío a Lustrador
+PICKING_TYPE_LUSTRADOR = None
+if 'LUST' in SUBCONTRACT_LOCATIONS:
+    picking_type_name = f'{WH_CODE}: Envío a Lustrador'
+    existing_pt = search_read('stock.picking.type', [['name', '=', picking_type_name]], ['id'])
+
+    if existing_pt:
+        PICKING_TYPE_LUSTRADOR = existing_pt[0]['id']
+        print(f"      - Existe: {picking_type_name}")
+    else:
+        # Obtener secuencia
+        seq_id = create('ir.sequence', {
+            'name': f'Sequence Envío Lustrador',
+            'code': 'stock.picking.lustrador',
+            'prefix': f'{WH_CODE}/LUST/',
+            'padding': 5,
+        })
+
+        PICKING_TYPE_LUSTRADOR = create('stock.picking.type', {
+            'name': picking_type_name,
+            'code': 'internal',
+            'sequence_code': 'INT',
+            'warehouse_id': WH_ID,
+            'default_location_src_id': WH_STOCK_LOC,
+            'default_location_dest_id': SUBCONTRACT_LOCATIONS['LUST'],
+            'sequence_id': seq_id,
+        })
+        print(f"      + Creado: {picking_type_name}")
+
+# Crear Ruta para Resupply Lustrador
+RUTA_RESUPPLY_LUST = None
+if PICKING_TYPE_LUSTRADOR and 'LUST' in SUBCONTRACT_LOCATIONS:
+    route_name = 'Resupply Lustrador (Transfer Visible)'
+    existing_route = search_read('stock.route', [['name', '=', route_name]], ['id'])
+
+    if existing_route:
+        RUTA_RESUPPLY_LUST = existing_route[0]['id']
+        print(f"      - Existe: {route_name}")
+    else:
+        RUTA_RESUPPLY_LUST = create('stock.route', {
+            'name': route_name,
+            'product_selectable': True,
+            'product_categ_selectable': False,
+            'warehouse_selectable': False,
+            'active': True,
+        })
+
+        # Crear regla de stock para mover de Stock → Lustrador
+        create('stock.rule', {
+            'name': 'Stock → Lustrador (Manual Transfer)',
+            'route_id': RUTA_RESUPPLY_LUST,
+            'location_src_id': WH_STOCK_LOC,
+            'location_dest_id': SUBCONTRACT_LOCATIONS['LUST'],
+            'action': 'pull',
+            'picking_type_id': PICKING_TYPE_LUSTRADOR,
+            'procure_method': 'make_to_stock',
+            'auto': 'manual',  # Requiere validación manual
+        })
+        print(f"      + Creada: {route_name}")
+        print(f"        -> Regla: Stock → Lustrador (transfer manual)")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. DATOS BASE
@@ -578,7 +687,7 @@ for med in MEDIDAS:
     ATTR_VALUES[f"Medidas|{med['nombre']}"] = val_id
     print(f"      - {med['nombre']}")
 
-# Terminación
+# Terminación (para Tapas de madera)
 attr_id, _ = get_or_create('product.attribute', [['name', '=', 'Terminación']], {
     'name': 'Terminación', 'create_variant': 'always', 'display_type': 'radio'
 })
@@ -592,6 +701,17 @@ for term in TERMINACIONES:
     )
     ATTR_VALUES[f"Terminación|{term['nombre']}"] = val_id
     print(f"      - {term['nombre']}")
+
+# Terminación para Mesa (incluye "Sin Terminación")
+print(f"  Terminación Mesa (valores adicionales):")
+for term in TERMINACIONES_MESA:
+    val_id, _ = get_or_create('product.attribute.value',
+        [['name', '=', term['nombre']], ['attribute_id', '=', attr_id]],
+        {'name': term['nombre'], 'attribute_id': attr_id}
+    )
+    ATTR_VALUES[f"Terminación|{term['nombre']}"] = val_id
+    if term['nombre'] == 'Sin Terminación':
+        print(f"      + {term['nombre']} (para Mármol/Neolith)")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 5. WORK CENTERS
@@ -769,8 +889,8 @@ for medida in MEDIDAS:
     codigo = f"TAPA-MADERA-RAW-{medida['codigo'].replace('x', '')}"
     costo = mat_madera['costo_base'] * medida['factor_precio']
 
-    # Rutas: Buy + MTO
-    rutas_componente = [r for r in [RUTA_BUY, RUTA_MTO] if r]
+    # Rutas: Buy + MTO + Resupply Lustrador (para transferencia visible)
+    rutas_componente = [r for r in [RUTA_BUY, RUTA_MTO, RUTA_RESUPPLY_LUST] if r]
 
     tmpl_id, created = get_or_create('product.template',
         [['default_code', '=', codigo]],
@@ -788,7 +908,7 @@ for medida in MEDIDAS:
         }
     )
 
-    # Asegurar rutas si ya existe
+    # Asegurar rutas si ya existe (incluyendo nueva ruta de resupply)
     if not created and rutas_componente:
         write('product.template', [tmpl_id], {'route_ids': [(6, 0, rutas_componente)]})
 
@@ -805,6 +925,25 @@ for medida in MEDIDAS:
         )
 
     print(f"      {'+ Creada' if created else '- Existe'}: {nombre}")
+
+# 8.1.1 Reglas de reabastecimiento para Tapas Sin Terminar
+print("\n  8.1.1 Creando reglas de reabastecimiento (para PO automática a Carpintería):")
+warehouse_data = search_read('stock.warehouse', [], ['id', 'lot_stock_id'])
+STOCK_LOCATION = warehouse_data[0]['lot_stock_id'][0] if warehouse_data else 1
+
+for medida_cod, tapa_data in TAPAS_SIN_TERMINAR.items():
+    orderpoint_id, created = get_or_create('stock.warehouse.orderpoint',
+        [['product_id', '=', tapa_data['variant_id']]],
+        {
+            'product_id': tapa_data['variant_id'],
+            'location_id': STOCK_LOCATION,
+            'product_min_qty': 0,
+            'product_max_qty': 0,
+            'trigger': 'auto',  # Se ejecuta automáticamente cuando hay demanda
+        }
+    )
+    if created:
+        print(f"      + Orderpoint: Tapa Sin Terminar {medida_cod}")
 
 # 8.2 Tapas CON terminación
 print("\n  8.2 Tapas CON terminación (subcontratación a Lustrador):")
@@ -946,6 +1085,16 @@ else:
         })
         print(f"    -> Atributo: {attr_name}")
 
+    # Agregar atributo Terminación a Mesa
+    attr_id = ATRIBUTOS['Terminación']
+    term_values = [ATTR_VALUES[f"Terminación|{t['nombre']}"] for t in TERMINACIONES_MESA]
+    create('product.template.attribute.line', {
+        'product_tmpl_id': mesa_tmpl_id,
+        'attribute_id': attr_id,
+        'value_ids': [(6, 0, term_values)],
+    })
+    print(f"    -> Atributo: Terminación (Sin Terminación + 3 lustres)")
+
 # Asegurar rutas Manufacture + MTO (fabricación bajo pedido)
 write('product.template', [mesa_tmpl_id], {
     'route_ids': [(6, 0, rutas_mesa)] if rutas_mesa else [],
@@ -980,6 +1129,7 @@ for variante in mesa_variantes:
     material_tapa = None
     material_base = None
     medida_codigo = None
+    terminacion = None
 
     for vv in var_values:
         attr = search_read('product.attribute', [['id', '=', vv['attribute_id'][0]]], ['name'])[0]
@@ -989,14 +1139,31 @@ for variante in mesa_variantes:
             material_base = vv['name']
         elif attr['name'] == 'Medidas':
             medida_codigo = vv['name'].replace(' cm', '')
+        elif attr['name'] == 'Terminación':
+            terminacion = vv['name']
 
-    if not all([material_tapa, material_base, medida_codigo]):
+    if not all([material_tapa, material_base, medida_codigo, terminacion]):
         continue
 
-    # Determinar componente tapa
+    # Validar combinación válida:
+    # - Madera + Lustre/Natural = OK
+    # - Madera + Sin Terminación = SKIP (combinación no válida)
+    # - Mármol/Neolith + Sin Terminación = OK
+    # - Mármol/Neolith + Lustre/Natural = SKIP (combinación no válida)
+    es_madera = (material_tapa == 'Madera Paraíso')
+    es_terminacion_lustre = (terminacion != 'Sin Terminación')
+
+    if es_madera and not es_terminacion_lustre:
+        continue  # Madera sin terminación no es válida
+    if not es_madera and es_terminacion_lustre:
+        continue  # Mármol/Neolith con lustre no es válida
+
+    # Determinar componente tapa según material y terminación
     if material_tapa == 'Madera Paraíso':
-        tapa_id = TAPAS_TERMINADAS.get((medida_codigo, 'Lustre Mate'))
+        # Madera usa la tapa terminada con el lustre seleccionado
+        tapa_id = TAPAS_TERMINADAS.get((medida_codigo, terminacion))
     else:
+        # Mármol/Neolith usa tapa simple (sin terminación)
         tapa_id = TAPAS_SIMPLES.get((material_tapa, medida_codigo))
 
     base_id = BASES.get((material_base, medida_codigo))
@@ -1173,10 +1340,11 @@ print("\n" + "═"*70)
 print("13. CREANDO ORDEN DE DEMO (FLUJO AUTOMÁTICO MTO)")
 print("═"*70)
 
-# Buscar variante de madera
+# Buscar variante de madera CON terminación Lustre Mate
 mesa_madera = None
 for var in mesa_variantes:
-    if 'Madera' in var['display_name']:
+    # Buscar variante: Madera Paraíso + cualquier base + cualquier medida + Lustre Mate
+    if 'Madera' in var['display_name'] and 'Lustre Mate' in var['display_name']:
         mesa_madera = var
         break
 
@@ -1277,21 +1445,41 @@ print(f"""
   PRODUCTOS:
   ────────────────────────────────────────────────────────────────────
   Mesa Comedor Premium: {len(mesa_variantes)} variantes
-    (3 materiales tapa x 2 bases x 2 medidas)
+    (3 materiales tapa x 2 bases x 2 medidas x 4 terminaciones)
+    Combinaciones válidas con BoM:
+    - Mármol/Neolith + Sin Terminación: 8 variantes
+    - Madera + Lustre (Mate/Brillante/Natural): 12 variantes
+
   Tapas Mármol/Neolith: 4 productos
-  Tapas Madera Sin Terminar: 2 productos
+  Tapas Madera Sin Terminar: 2 productos (con orderpoints)
   Tapas Madera Terminadas: 6 variantes (con terminación)
   Bases Metálicas: 4 productos
 
   RUTAS MTO (Replenish on Order):
   ────────────────────────────────────────────────────────────────────
-  Mesa:           Manufacture + MTO
-  Bases:          Buy + MTO
-  Tapas Simples:  Buy + MTO
-  Tapas Madera:   Buy + MTO
+  Mesa:                  Manufacture + MTO
+  Bases:                 Buy + MTO
+  Tapas Simples:         Buy + MTO
+  Tapas Madera:          Buy + MTO
+  Tapa Sin Terminar:     Buy + MTO + Resupply Lustrador (transfer visible)
 
   Flujo automático:
   Venta confirmada → MO automática → POs automáticas (por MTO)
+
+  TRANSFERENCIA VISIBLE A SUBCONTRATISTA:
+  ────────────────────────────────────────────────────────────────────
+  Picking Type: "Envío a Lustrador"
+  Ruta: "Resupply Lustrador (Transfer Visible)"
+  Ubicación: Inventario → Operaciones → Traslados internos
+
+  SELECCIÓN DE TERMINACIÓN:
+  ────────────────────────────────────────────────────────────────────
+  Al crear una venta de Mesa, el usuario ahora puede elegir:
+  - Material Tapa: Mármol Carrara, Neolith Negro, Madera Paraíso
+  - Material Base: Acero Negro, Acero Dorado
+  - Medidas: 180x90 cm, 220x100 cm
+  - Terminación: Sin Terminación (para Mármol/Neolith)
+                 Lustre Mate, Lustre Brillante, Natural (para Madera)
 
   PLANIFICACIÓN:
   ────────────────────────────────────────────────────────────────────
@@ -1319,17 +1507,17 @@ print(f"""
   | Ensamble Mesa          | 1 día     |
   | Entrega al cliente     | 14 días   |
 
-  FLUJO DE MADERA:
+  FLUJO DE MADERA (con transferencia visible):
   ────────────────────────────────────────────────────────────────────
 
-  ┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-  │   CARPINTERÍA   │     │     LUSTRADOR       │     │     STOCK       │
-  │   Hnos. García  │────>│  Lustres & Acabados │────>│   Disponible    │
-  └─────────────────┘     └─────────────────────┘     └─────────────────┘
-         │                         │                         │
-    Tapa Madera              Tapa Madera               Tapa Madera
-    SIN Terminar             CON Terminación           Terminada
-    (Compra PO)              (Subcontratación)         (Para MO Mesa)
+  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+  │   CARPINTERÍA   │     │   WH/STOCK      │     │     LUSTRADOR       │     │     STOCK       │
+  │   Hnos. García  │────>│   (Recepción)   │────>│  Lustres & Acabados │────>│   Disponible    │
+  └─────────────────┘     └─────────────────┘     └─────────────────────┘     └─────────────────┘
+         │                       │                         │                         │
+    Tapa Madera           Tapa Sin Terminar         Tapa Madera               Tapa Madera
+    SIN Terminar          en Stock                  CON Terminación           Terminada
+    (Compra PO)           (Envío a Lustrador)       (Subcontratación)         (Para MO Mesa)
 
   ════════════════════════════════════════════════════════════════════
 

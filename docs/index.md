@@ -20,19 +20,22 @@ Una empresa fabrica **Mesas de Comedor Premium** con las siguientes característ
 |------------|-----------|-----------|
 | **Tapa** | Mármol, Neolith, Madera | Marmolería, Neolith Argentina, Carpintería → Lustrador |
 | **Base** | Acero Negro, Acero Dorado | Metalúrgica |
-| **Mesa** | 12 combinaciones | Ensamblado interno |
+| **Mesa** | 20 combinaciones válidas | Ensamblado interno |
+| **Terminación** | Sin Terminación, Lustre Mate/Brillante, Natural | Depende del material |
 
-### Flujo especial para Tapas de Madera
+### Flujo especial para Tapas de Madera (con transferencia visible)
 
 ```
-┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-│   CARPINTERÍA   │     │     LUSTRADOR       │     │     FÁBRICA     │
-│   (Proveedor A) │────▶│    (Proveedor B)    │────▶│    (Interno)    │
-└─────────────────┘     └─────────────────────┘     └─────────────────┘
-        │                         │                         │
-   Tapa Madera              Tapa Madera               Mesa Final
-   SIN Terminar             CON Terminación           Ensamblada
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+│   CARPINTERÍA   │     │   WH/STOCK      │     │     LUSTRADOR       │     │     FÁBRICA     │
+│   (Proveedor A) │────▶│   (Recepción)   │────▶│    (Proveedor B)    │────▶│    (Interno)    │
+└─────────────────┘     └─────────────────┘     └─────────────────────┘     └─────────────────┘
+        │                       │                         │                         │
+   Tapa Madera            Envío a Lustrador         Tapa Madera               Mesa Final
+   SIN Terminar           (Transfer visible)        CON Terminación           Ensamblada
 ```
+
+La transferencia de Stock → Lustrador aparece en **Inventario → Operaciones → Traslados internos**.
 
 ---
 
