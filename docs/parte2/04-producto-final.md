@@ -38,14 +38,17 @@ Inventario → Productos → Productos → Nuevo
 
 ### Pestaña: Atributos y Variantes
 
-Agregar cuatro líneas de atributos:
+Agregar cuatro líneas de atributos **en este orden**:
 
-| Atributo | Valores a seleccionar |
-|----------|----------------------|
-| Material Tapa | Mármol Carrara, Neolith Negro, Madera Paraíso |
-| Material Base | Acero Negro, Acero Dorado |
-| Medidas | 180x90 cm, 220x100 cm |
-| Terminación | Sin Terminación, Lustre Mate, Lustre Brillante, Natural |
+| # | Atributo | Valores a seleccionar |
+|---|----------|----------------------|
+| 1 | Material Tapa | Mármol Carrara, Neolith Negro, Madera Paraíso |
+| 2 | Terminación | Sin Terminación, Lustre Mate, Lustre Brillante, Natural |
+| 3 | Material Base | Acero Negro, Acero Dorado |
+| 4 | Medidas | 180x90 cm, 220x100 cm |
+
+!!! tip "Orden de atributos"
+    Terminación va inmediatamente después de Material Tapa para que las exclusiones (configuradas en el siguiente paso) filtren las opciones visualmente mientras el usuario selecciona.
 
 Al guardar, Odoo crea automáticamente:
 
@@ -111,7 +114,69 @@ Click para ver las 48 variantes. Ejemplos de **variantes con BoM**:
 
 ---
 
-## 4.3 Configurar Precios por Variante (Opcional)
+## 4.3 Configurar Exclusiones de Atributos
+
+Las exclusiones evitan que el usuario seleccione combinaciones inválidas en el configurador de ventas.
+
+### Acceder a Exclusiones
+
+```
+En la Mesa → Pestaña Atributos y Variantes → Click en un valor de atributo → Sección "Excluir para"
+```
+
+### Configurar Exclusiones
+
+Para cada material de tapa, configurar qué terminaciones excluir:
+
+#### Mármol Carrara
+
+1. En Atributos y Variantes, click en **Mármol Carrara**
+2. En la sección **Excluir para**, agregar:
+   - Producto: Mesa Comedor Premium
+   - Valores de atributo: Lustre Mate, Lustre Brillante, Natural
+
+#### Neolith Negro
+
+1. Click en **Neolith Negro**
+2. En **Excluir para**, agregar:
+   - Producto: Mesa Comedor Premium
+   - Valores de atributo: Lustre Mate, Lustre Brillante, Natural
+
+#### Madera Paraíso
+
+1. Click en **Madera Paraíso**
+2. En **Excluir para**, agregar:
+   - Producto: Mesa Comedor Premium
+   - Valores de atributo: Sin Terminación
+
+### Resultado
+
+| Material seleccionado | Terminaciones disponibles |
+|----------------------|---------------------------|
+| Mármol Carrara | Solo "Sin Terminación" |
+| Neolith Negro | Solo "Sin Terminación" |
+| Madera Paraíso | Lustre Mate, Lustre Brillante, Natural |
+
+### Verificar Exclusiones
+
+Para confirmar que las exclusiones funcionan:
+
+1. Ir a **Ventas → Pedidos → Nuevo**
+2. Agregar un producto: **Mesa Comedor Premium**
+3. En el configurador de variantes:
+   - Seleccionar **Mármol Carrara** como Material Tapa
+   - Verificar que Lustre Mate, Lustre Brillante y Natural aparecen **deshabilitados** (grises)
+   - Solo **Sin Terminación** debe estar disponible
+4. Cambiar a **Madera Paraíso**:
+   - Verificar que **Sin Terminación** aparece deshabilitado
+   - Solo las opciones de lustre deben estar disponibles
+
+!!! success "UX mejorada"
+    El vendedor solo puede seleccionar combinaciones válidas, evitando errores en la configuración del pedido.
+
+---
+
+## 4.4 Configurar Precios por Variante (Opcional)
 
 Si diferentes combinaciones tienen diferentes precios:
 
@@ -173,12 +238,12 @@ Verificar en cada componente que tenga proveedor configurado en la pestaña **Co
 | Producto final | 1 (48 variantes, 20 con BoM) |
 | **Total variantes** | **54** |
 
-!!! tip "PO Automática a Carpintería (MTO Puro)"
-    Las Tapas Madera Sin Terminar tienen la ruta **Resupply Lustrador** con `procure_method: make_to_order`.
+!!! tip "PO Automática a Carpintería"
+    Las Tapas Madera Sin Terminar tienen la ruta **Resupply Lustrador** configurada con el método de suministro "Trigger Another Rule" (ver [Parte 1 - Configuración de Inventario](../parte1/02-config-inventario.md#25-crear-ruta-resupply-lustrador)).
 
-    Esto propaga el MTO y genera automáticamente la PO a Carpintería **sin necesidad de orderpoints**.
+    Esto hace que cuando se necesita una Tapa Sin Terminar, el sistema genera automáticamente una PO a Carpintería sin necesidad de reglas de reabastecimiento manuales.
 
-    **Flujo**: Venta → MO Mesa → PO Lustrador → SBC MO → Move (MTO) → PO Carpintería
+    **Flujo**: Venta → MO Mesa → PO Lustrador → Recepción → PO Carpintería (automática)
 
 ---
 

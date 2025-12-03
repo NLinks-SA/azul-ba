@@ -59,16 +59,16 @@ En sección **Proveedores** (tabla):
 
 ### Crear las otras Bases
 
-Repetir el proceso para:
+Repetir el proceso para cada base (mismas rutas Buy + MTO, mismo proveedor Metalúrgica):
 
-| Producto | Código | Costo |
-|----------|--------|-------|
-| Base Acero Negro 220x100 | BASE-NEGRO-22010 | 180.00 |
-| Base Acero Dorado 180x90 | BASE-DORADO-18090 | 180.00 |
-| Base Acero Dorado 220x100 | BASE-DORADO-22010 | 220.00 |
+| Producto | Código | Costo | Proveedor | Lead Time |
+|----------|--------|-------|-----------|-----------|
+| Base Acero Negro 220x100 | BASE-NEGRO-22010 | 180.00 | Metalúrgica Precisión S.A. | 5 días |
+| Base Acero Dorado 180x90 | BASE-DORADO-18090 | 180.00 | Metalúrgica Precisión S.A. | 5 días |
+| Base Acero Dorado 220x100 | BASE-DORADO-22010 | 220.00 | Metalúrgica Precisión S.A. | 5 días |
 
 !!! tip "Duplicar producto"
-    Podés usar **Acción → Duplicar** para crear productos similares más rápido.
+    Podés usar **Acción → Duplicar** para crear productos similares más rápido. Recordá actualizar nombre, código y costo.
 
 ---
 
@@ -152,9 +152,9 @@ Estas tapas se compran a Carpintería y luego van al Lustrador.
 
 ### Crear otra Tapa Sin Terminar
 
-| Producto | Código | Precio |
-|----------|--------|--------|
-| Tapa Madera Sin Terminar 220x100 | TAPA-MADERA-ST-22010 | 150.00 |
+| Producto | Código | Costo | Proveedor | Lead Time |
+|----------|--------|-------|-----------|-----------|
+| Tapa Madera Sin Terminar 220x100 | TAPA-MADERA-ST-22010 | 150.00 | Carpintería Artesanal Hnos. García | 5 días |
 
 Con las mismas rutas: **Buy + MTO + Resupply Lustrador**
 
@@ -206,11 +206,11 @@ Al guardar, se crean **3 variantes** automáticamente.
 
 ### Crear otra Tapa Terminada
 
-| Producto | Código | Precio |
-|----------|--------|--------|
-| Tapa Madera Terminada 220x100 | TAPA-MADERA-TERM-22010 | 350.00 |
+| Producto | Código | Costo | Proveedor | Lead Time |
+|----------|--------|-------|-----------|-----------|
+| Tapa Madera Terminada 220x100 | TAPA-MADERA-TERM-22010 | 350.00 | Lustres & Acabados Premium | 3 días |
 
-Con el mismo atributo **Terminación** (3 valores).
+Con el mismo atributo **Terminación** (3 valores) y mismas rutas **Buy + MTO**.
 
 ---
 
