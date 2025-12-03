@@ -7,23 +7,27 @@
 
 ---
 
-## 2.1 Activar Multi-Step Routes
+## 2.1 Activar Ubicaciones y Rutas
 
 ### Ubicación
 ```
-Inventario → Configuración → Ajustes → Almacén
+Inventario → Configuración → Ajustes → sección "Warehouse"
 ```
 
 ### Configuración
 
-- [x] **Storage Locations** (Ubicaciones de almacenamiento)
-- [x] **Multi-Step Routes** (Rutas de múltiples pasos)
+En la sección **Warehouse**, activar las siguientes opciones:
 
-!!! info "¿Por qué Multi-Step Routes?"
-    Permite configurar flujos como:
+| Opción en UI | Descripción | Activar |
+|--------------|-------------|---------|
+| **Track product location in your warehouse** | Habilita ubicaciones múltiples (Storage Locations) | ☑ Sí |
+| **Use your own routes** | Habilita rutas personalizadas (Multi-Step Routes) | ☑ Sí |
 
-    - Recepción → Control de Calidad → Stock
-    - Stock → Picking → Packing → Envío
+!!! info "¿Por qué estas opciones?"
+    - **Track product location**: Permite crear ubicaciones específicas (Stock, Input, QC, etc.)
+    - **Use your own routes**: Permite configurar flujos como:
+      - Recepción → Control de Calidad → Stock
+      - Stock → Picking → Packing → Envío
 
     Sin esto, los productos van directo de recepción a stock.
 
@@ -171,12 +175,18 @@ Inventario → Configuración → Rutas
 | **Tipo de operación** | WH: Recepciones |
 | **Ubicación de origen** | Partners/Vendors |
 | **Ubicación de destino** | WH/Stock |
-| **Método de suministro** | Take From Stock, if unavailable, **Trigger Another Rule** |
+| **Supply Method** | **Trigger Another Rule** |
 
-!!! warning "Importante: Método de suministro"
-    El valor **"Trigger Another Rule"** (o "make_to_order" técnicamente) es crítico.
+!!! warning "Importante: Supply Method"
+    El campo **Supply Method** tiene 3 opciones:
 
-    Esto propaga el MTO y genera automáticamente la PO al proveedor del componente (Carpintería) sin necesidad de reglas de reabastecimiento (orderpoints).
+    | Opción | Comportamiento |
+    |--------|----------------|
+    | Take From Stock | Usa stock disponible (MTS) |
+    | **Trigger Another Rule** | Siempre dispara otra regla (MTO puro) ← **Seleccionar esta** |
+    | Take From Stock, if unavailable, Trigger Another Rule | Híbrido MTS/MTO |
+
+    Seleccionar **"Trigger Another Rule"** para que siempre genere automáticamente la PO a Carpintería cuando se demande el producto.
 
 ### Guardar
 

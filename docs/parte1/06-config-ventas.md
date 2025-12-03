@@ -19,7 +19,11 @@ Inventario → Configuración → Rutas
 ```
 
 !!! tip "Ver rutas inactivas"
-    Si no ves la ruta MTO, activá el filtro para ver rutas **archivadas/inactivas**.
+    Si no ves la ruta MTO en la lista:
+
+    1. Click en el icono de **filtro** (embudo) en la barra de búsqueda
+    2. Click en **Archived** para incluir rutas archivadas
+    3. Alternativamente, buscar directamente "MTO" en el campo de búsqueda
 
 ### Buscar la Ruta
 
