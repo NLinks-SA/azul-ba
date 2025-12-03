@@ -140,7 +140,11 @@ Estas tapas se compran a Carpintería y luego van al Lustrador.
 
 | Campo | Valor |
 |-------|-------|
-| **Rutas** | ☑ Buy, ☑ Replenish on Order (MTO) |
+| **Rutas** | ☑ Buy, ☑ Replenish on Order (MTO), ☑ Resupply Lustrador |
+
+!!! info "Ruta Resupply Lustrador"
+    Esta ruta se crea en [Parte 1 - Configuración de Inventario](../parte1/02-config-inventario.md#25-crear-ruta-resupply-lustrador).
+    Es necesaria para propagar el MTO y generar automáticamente la PO a Carpintería.
 
 **Guardar**
 
@@ -151,6 +155,8 @@ Estas tapas se compran a Carpintería y luego van al Lustrador.
 | Producto | Código | Precio |
 |----------|--------|--------|
 | Tapa Madera Sin Terminar 220x100 | TAPA-MADERA-ST-22010 | 150.00 |
+
+Con las mismas rutas: **Buy + MTO + Resupply Lustrador**
 
 ---
 
@@ -228,8 +234,8 @@ Filtrar por categoría "Bases" y "Tapas":
 | Tapa Mármol Carrara 220x100 | Buy + MTO | Marmolería |
 | Tapa Neolith Negro 180x90 | Buy + MTO | Neolith |
 | Tapa Neolith Negro 220x100 | Buy + MTO | Neolith |
-| Tapa Madera Sin Terminar 180x90 | Buy + MTO | Carpintería |
-| Tapa Madera Sin Terminar 220x100 | Buy + MTO | Carpintería |
+| Tapa Madera Sin Terminar 180x90 | Buy + MTO + Resupply Lustrador | Carpintería |
+| Tapa Madera Sin Terminar 220x100 | Buy + MTO + Resupply Lustrador | Carpintería |
 | Tapa Madera Terminada 180x90 (3 var) | Buy + MTO | Lustrador |
 | Tapa Madera Terminada 220x100 (3 var) | Buy + MTO | Lustrador |
 

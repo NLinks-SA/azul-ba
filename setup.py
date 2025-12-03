@@ -343,21 +343,30 @@ if '--limpiar' in sys.argv:
         execute('stock.warehouse.orderpoint', 'unlink', [orderpoints])
         print(f"  {len(orderpoints)} orderpoints eliminados")
 
-    # Eliminar ruta y reglas de Resupply Lustrador
+    # Archivar ruta y reglas de Resupply Lustrador (no se pueden eliminar si hay stock.moves)
     resupply_routes = search('stock.route', [['name', 'ilike', 'Resupply Lustrador%']])
     if resupply_routes:
-        # Primero eliminar las reglas
+        # Archivar las reglas primero
         rules = search('stock.rule', [['route_id', 'in', resupply_routes]])
         if rules:
-            execute('stock.rule', 'unlink', [rules])
-        execute('stock.route', 'unlink', [resupply_routes])
-        print(f"  {len(resupply_routes)} rutas de resupply eliminadas")
+            try:
+                execute('stock.rule', 'unlink', [rules])
+            except:
+                write('stock.rule', rules, {'active': False})
+        try:
+            execute('stock.route', 'unlink', [resupply_routes])
+        except:
+            write('stock.route', resupply_routes, {'active': False})
+        print(f"  {len(resupply_routes)} rutas de resupply archivadas/eliminadas")
 
-    # Eliminar Picking Type de Envío a Lustrador
+    # Archivar Picking Type de Envío a Lustrador (no se puede eliminar si hay stock.rules)
     lustrador_pt = search('stock.picking.type', [['name', 'ilike', '%Envío a Lustrador%']])
     if lustrador_pt:
-        execute('stock.picking.type', 'unlink', [lustrador_pt])
-        print(f"  {len(lustrador_pt)} picking types eliminados")
+        try:
+            execute('stock.picking.type', 'unlink', [lustrador_pt])
+        except:
+            write('stock.picking.type', lustrador_pt, {'active': False})
+        print(f"  {len(lustrador_pt)} picking types archivados/eliminados")
 
     # Eliminar secuencias de Lustrador
     lust_seq = search('ir.sequence', [['code', '=', 'stock.picking.lustrador']])
@@ -420,8 +429,19 @@ if warehouse:
 
 # 0.2 Ubicaciones de subcontratista
 print("\n  0.2 Creando ubicaciones de subcontratista...")
-supplier_loc = search_read('stock.location', [['usage', '=', 'supplier']], ['id'])
-SUPPLIER_PARENT_ID = supplier_loc[0]['id'] if supplier_loc else 1
+
+# IMPORTANTE: Las ubicaciones de subcontratista deben ser hijas de "Subcontratación"
+# para que la ruta "Subcontratista de reabastecimiento" funcione correctamente
+subcontract_parent = search_read('stock.location', [['name', '=', 'Subcontratación']], ['id'])
+if subcontract_parent:
+    SUBCONTRACT_PARENT_ID = subcontract_parent[0]['id']
+else:
+    # Crear ubicación padre si no existe
+    SUBCONTRACT_PARENT_ID = create('stock.location', {
+        'name': 'Subcontratación',
+        'usage': 'internal',
+    })
+print(f"      Ubicación padre 'Subcontratación': ID {SUBCONTRACT_PARENT_ID}")
 
 SUBCONTRACT_LOCATIONS = {}
 subcontract_locs = [
@@ -434,11 +454,16 @@ subcontract_locs = [
 for code, name in subcontract_locs:
     loc_id, created = get_or_create('stock.location',
         [['name', '=', name]],
-        {'name': name, 'usage': 'internal', 'location_id': SUPPLIER_PARENT_ID, 'barcode': code}
+        {'name': name, 'usage': 'internal', 'location_id': SUBCONTRACT_PARENT_ID, 'barcode': code}
     )
+    # Asegurar que el parent sea correcto (en caso de que exista con parent incorrecto)
+    if not created:
+        write('stock.location', [loc_id], {'location_id': SUBCONTRACT_PARENT_ID})
     SUBCONTRACT_LOCATIONS[code] = loc_id
     if created:
         print(f"      + {name}")
+    else:
+        print(f"      ✓ {name} (parent corregido)")
 
 # 0.3 Ubicaciones de tránsito entre proveedores
 print("\n  0.3 Creando ubicaciones de tránsito...")
@@ -522,15 +547,17 @@ if PICKING_TYPE_LUSTRADOR and 'LUST' in SUBCONTRACT_LOCATIONS:
         })
 
         # Crear regla de stock para mover de Stock → Lustrador
+        # IMPORTANTE: procure_method='make_to_order' propaga la demanda al route Buy
+        # Esto genera automáticamente la PO a Carpintería cuando hay demanda
         create('stock.rule', {
-            'name': 'Stock → Lustrador (Manual Transfer)',
+            'name': 'Stock → Lustrador (MTO Transfer)',
             'route_id': RUTA_RESUPPLY_LUST,
             'location_src_id': WH_STOCK_LOC,
             'location_dest_id': SUBCONTRACT_LOCATIONS['LUST'],
             'action': 'pull',
             'picking_type_id': PICKING_TYPE_LUSTRADOR,
-            'procure_method': 'make_to_stock',
-            'auto': 'manual',  # Requiere validación manual
+            'procure_method': 'make_to_order',  # Propaga demanda → genera PO
+            'auto': 'manual',  # Transfer requiere validación manual (visible)
         })
         print(f"      + Creada: {route_name}")
         print(f"        -> Regla: Stock → Lustrador (transfer manual)")
@@ -565,6 +592,9 @@ if RUTA_BUY:
     write('stock.route', [RUTA_BUY], {'product_selectable': True})
 if RUTA_MANUFACTURE:
     write('stock.route', [RUTA_MANUFACTURE], {'product_selectable': True})
+
+# NOTA: NO se necesita la ruta "Resupply Subcontractor" de Odoo
+# Nuestra ruta "Resupply Lustrador" con procure_method='make_to_order' hace el trabajo
 
 # Categorías
 print("\n  Creando categorías...")
@@ -889,7 +919,9 @@ for medida in MEDIDAS:
     codigo = f"TAPA-MADERA-RAW-{medida['codigo'].replace('x', '')}"
     costo = mat_madera['costo_base'] * medida['factor_precio']
 
-    # Rutas: Buy + MTO + Resupply Lustrador (para transferencia visible)
+    # Rutas: Buy + MTO + Resupply Lustrador
+    # La ruta "Resupply Lustrador" tiene procure_method='make_to_order'
+    # Esto propaga el MTO y genera automáticamente la PO a Carpintería (sin orderpoints)
     rutas_componente = [r for r in [RUTA_BUY, RUTA_MTO, RUTA_RESUPPLY_LUST] if r]
 
     tmpl_id, created = get_or_create('product.template',
@@ -926,24 +958,9 @@ for medida in MEDIDAS:
 
     print(f"      {'+ Creada' if created else '- Existe'}: {nombre}")
 
-# 8.1.1 Reglas de reabastecimiento para Tapas Sin Terminar
-print("\n  8.1.1 Creando reglas de reabastecimiento (para PO automática a Carpintería):")
-warehouse_data = search_read('stock.warehouse', [], ['id', 'lot_stock_id'])
-STOCK_LOCATION = warehouse_data[0]['lot_stock_id'][0] if warehouse_data else 1
-
-for medida_cod, tapa_data in TAPAS_SIN_TERMINAR.items():
-    orderpoint_id, created = get_or_create('stock.warehouse.orderpoint',
-        [['product_id', '=', tapa_data['variant_id']]],
-        {
-            'product_id': tapa_data['variant_id'],
-            'location_id': STOCK_LOCATION,
-            'product_min_qty': 0,
-            'product_max_qty': 0,
-            'trigger': 'auto',  # Se ejecuta automáticamente cuando hay demanda
-        }
-    )
-    if created:
-        print(f"      + Orderpoint: Tapa Sin Terminar {medida_cod}")
+# NOTA: NO se necesitan orderpoints para Tapas Sin Terminar
+# La ruta "Resupply Lustrador" con procure_method='make_to_order' propaga el MTO
+# y genera automáticamente la PO a Carpintería
 
 # 8.2 Tapas CON terminación
 print("\n  8.2 Tapas CON terminación (subcontratación a Lustrador):")
@@ -1451,7 +1468,7 @@ print(f"""
     - Madera + Lustre (Mate/Brillante/Natural): 12 variantes
 
   Tapas Mármol/Neolith: 4 productos
-  Tapas Madera Sin Terminar: 2 productos (con orderpoints)
+  Tapas Madera Sin Terminar: 2 productos (MTO → PO automática)
   Tapas Madera Terminadas: 6 variantes (con terminación)
   Bases Metálicas: 4 productos
 
@@ -1461,10 +1478,10 @@ print(f"""
   Bases:                 Buy + MTO
   Tapas Simples:         Buy + MTO
   Tapas Madera:          Buy + MTO
-  Tapa Sin Terminar:     Buy + MTO + Resupply Lustrador (transfer visible)
+  Tapa Sin Terminar:     Buy + MTO + Resupply Lustrador
 
-  Flujo automático:
-  Venta confirmada → MO automática → POs automáticas (por MTO)
+  Flujo automático (MTO puro, sin orderpoints):
+  Venta → MO Mesa → PO Lustrador → SBC MO → Move (MTO) → PO Carpintería
 
   TRANSFERENCIA VISIBLE A SUBCONTRATISTA:
   ────────────────────────────────────────────────────────────────────

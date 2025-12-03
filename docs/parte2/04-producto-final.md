@@ -152,8 +152,8 @@ Inventario → Productos → Productos
 | Tapa Mármol Carrara 220x100 | Almacenable | Buy + MTO | - |
 | Tapa Neolith Negro 180x90 | Almacenable | Buy + MTO | - |
 | Tapa Neolith Negro 220x100 | Almacenable | Buy + MTO | - |
-| Tapa Madera Sin Terminar 180x90 | Almacenable | Buy + MTO | - |
-| Tapa Madera Sin Terminar 220x100 | Almacenable | Buy + MTO | - |
+| Tapa Madera Sin Terminar 180x90 | Almacenable | Buy + MTO + Resupply Lustrador | - |
+| Tapa Madera Sin Terminar 220x100 | Almacenable | Buy + MTO + Resupply Lustrador | - |
 | Tapa Madera Terminada 180x90 | Almacenable | Buy + MTO | 3 |
 | Tapa Madera Terminada 220x100 | Almacenable | Buy + MTO | 3 |
 
@@ -173,8 +173,12 @@ Verificar en cada componente que tenga proveedor configurado en la pestaña **Co
 | Producto final | 1 (48 variantes, 20 con BoM) |
 | **Total variantes** | **54** |
 
-!!! tip "Orderpoints para Tapas Sin Terminar"
-    Las Tapas Madera Sin Terminar tienen **reglas de reabastecimiento (orderpoints)** configuradas para generar PO automática a Carpintería cuando se necesitan para la producción de Tapas Terminadas.
+!!! tip "PO Automática a Carpintería (MTO Puro)"
+    Las Tapas Madera Sin Terminar tienen la ruta **Resupply Lustrador** con `procure_method: make_to_order`.
+
+    Esto propaga el MTO y genera automáticamente la PO a Carpintería **sin necesidad de orderpoints**.
+
+    **Flujo**: Venta → MO Mesa → PO Lustrador → SBC MO → Move (MTO) → PO Carpintería
 
 ---
 

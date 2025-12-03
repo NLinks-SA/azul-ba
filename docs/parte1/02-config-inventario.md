@@ -143,6 +143,47 @@ Al finalizar deberías tener:
 
 ---
 
+## 2.5 Crear Ruta "Resupply Lustrador"
+
+Esta ruta es necesaria para que las Tapas de Madera Sin Terminar generen automáticamente una PO a Carpintería cuando se demandan por el Lustrador.
+
+### Ubicación
+```
+Inventario → Configuración → Rutas
+```
+
+### Pasos
+
+1. Click en **Nuevo**
+
+2. Configurar la ruta:
+
+| Campo | Valor |
+|-------|-------|
+| **Nombre** | Resupply Lustrador |
+| **Aplicable en** | ☑ Producto |
+
+3. En la sección **Reglas**, click en **Agregar línea**:
+
+| Campo | Valor |
+|-------|-------|
+| **Acción** | Pull From |
+| **Tipo de operación** | WH: Recepciones |
+| **Ubicación de origen** | Partners/Vendors |
+| **Ubicación de destino** | WH/Stock |
+| **Método de suministro** | Take From Stock, if unavailable, **Trigger Another Rule** |
+
+!!! warning "Importante: Método de suministro"
+    El valor **"Trigger Another Rule"** (o "make_to_order" técnicamente) es crítico.
+
+    Esto propaga el MTO y genera automáticamente la PO al proveedor del componente (Carpintería) sin necesidad de reglas de reabastecimiento (orderpoints).
+
+### Guardar
+
+Click en **Guardar**.
+
+---
+
 ## Resumen de Cambios
 
 | Configuración | Valor |
@@ -151,3 +192,4 @@ Al finalizar deberías tener:
 | Almacén - Recepción | 3 pasos (Input → QC → Stock) |
 | Almacén - Envío | 3 pasos (Pick → Pack → Ship) |
 | Ubicaciones subcontratista | Creadas por proveedor |
+| Ruta Resupply Lustrador | ✅ Creada con MTO |

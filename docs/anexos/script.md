@@ -12,7 +12,7 @@ El script `setup.py` automatiza:
 - Creación de BoMs
 - Creación de Work Centers
 - Creación de Control Points de calidad
-- Reglas de reabastecimiento (orderpoints) para PO automáticas
+- Rutas MTO + Resupply Lustrador para PO automáticas en cadena (sin orderpoints)
 - Orden de demo para verificar el flujo
 
 ---
@@ -101,8 +101,8 @@ setup.py
 │   └── 4 productos con BoM subcontratación
 │
 ├── Sección 8: Tapas de Madera
-│   ├── Tapas Sin Terminar (2 productos + orderpoints + ruta resupply)
-│   └── Tapas Terminadas (6 variantes con BoM)
+│   ├── Tapas Sin Terminar (2 productos + Resupply Lustrador MTO)
+│   └── Tapas Terminadas (6 variantes con BoM subcontratación)
 │
 ├── Sección 9: Producto Final
 │   └── Mesa Comedor Premium
