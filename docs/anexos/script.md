@@ -116,7 +116,7 @@ setup.py
 │       └── Terminación (4 valores incl. Sin Terminación)
 │
 ├── Sección 5: Work Centers
-│   └── 3 centros de trabajo (LUST, ENSAM, QC)
+│   └── 2 centros de trabajo (ENSAM, QC)
 │
 ├── Sección 6: Bases Metálicas
 │   └── 4 productos (Buy + MTO)

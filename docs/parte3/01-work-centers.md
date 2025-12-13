@@ -1,6 +1,6 @@
 # 1. Work Centers
 
-Los Work Centers (Centros de Trabajo) representan estaciones donde se realizan operaciones de fabricación.
+Los Work Centers (Centros de Trabajo) representan estaciones donde se realizan operaciones de fabricación **internas**.
 
 ## Acceder a Work Centers
 
@@ -12,24 +12,20 @@ Manufactura → Configuración → Work Centers
 
 ## 1.1 Work Centers a Crear
 
-Necesitamos estos centros de trabajo:
+Solo necesitamos Work Centers para operaciones que hacemos **nosotros**:
 
 | Work Center | Código | Uso |
 |-------------|--------|-----|
-| Carpintería Externa | CARP | Referencia al proveedor |
-| Lustrado y Acabados | LUST | Referencia al proveedor |
-| Marmolería Externa | MARM | Referencia al proveedor |
-| Metalurgia Externa | META | Referencia al proveedor |
 | Ensamble Final | ENSAM | Interno - donde se ensambla la mesa |
 | Control de Calidad | QC | Interno - inspección |
 
-!!! info "¿Por qué Work Centers para proveedores externos?"
-    Aunque son externos, los Work Centers permiten:
+!!! info "¿Por qué NO creamos Work Centers para proveedores?"
+    Los proveedores externos (Carpintería, Lustrador, Metalúrgica, etc.) son **subcontratistas**.
+    El trabajo lo hacen ellos, no nosotros. Por eso:
 
-    - Planificar tiempos de producción
-    - Ver todo en el Gantt
-    - Calcular fechas de entrega
-    - Costear operaciones
+    - No controlamos sus operaciones internas
+    - El tiempo de entrega se define en el Lead Time del proveedor
+    - El costo está en la PO, no en operaciones
 
 ---
 
@@ -43,8 +39,8 @@ Click en **Nuevo**
 |-------|-------|
 | **Nombre** | Ensamble Final |
 | **Código** | ENSAM |
-| **Tiempo antes de producción** | 0.00 |
-| **Tiempo después de producción** | 0.00 |
+| **Tiempo antes de producción** | 15 min |
+| **Tiempo después de producción** | 10 min |
 
 ### Pestaña: Capacidad
 
@@ -80,49 +76,7 @@ Click en **Nuevo**
 
 ---
 
-## 1.4 Crear Work Centers Externos
-
-Para los proveedores externos, crear Work Centers de referencia:
-
-### Carpintería Externa
-
-| Campo | Valor |
-|-------|-------|
-| **Nombre** | Carpintería Externa |
-| **Código** | CARP |
-| **Capacidad** | 10 |
-| **Coste por hora** | 0.00 (el costo está en la PO) |
-
-### Lustrado y Acabados
-
-| Campo | Valor |
-|-------|-------|
-| **Nombre** | Lustrado y Acabados |
-| **Código** | LUST |
-| **Capacidad** | 10 |
-| **Coste por hora** | 0.00 |
-
-### Marmolería Externa
-
-| Campo | Valor |
-|-------|-------|
-| **Nombre** | Marmolería Externa |
-| **Código** | MARM |
-| **Capacidad** | 5 |
-| **Coste por hora** | 0.00 |
-
-### Metalurgia Externa
-
-| Campo | Valor |
-|-------|-------|
-| **Nombre** | Metalurgia Externa |
-| **Código** | META |
-| **Capacidad** | 10 |
-| **Coste por hora** | 0.00 |
-
----
-
-## 1.5 Configurar Capacidades Específicas (Opcional)
+## 1.4 Configurar Capacidades Específicas (Opcional)
 
 Si un Work Center tiene capacidad diferente por producto:
 
@@ -148,10 +102,6 @@ Manufactura → Configuración → Work Centers
 |-------------|--------|-----------|------------|
 | Ensamble Final | ENSAM | 2 | $50 |
 | Control de Calidad | QC | 5 | $30 |
-| Carpintería Externa | CARP | 10 | $0 |
-| Lustrado y Acabados | LUST | 10 | $0 |
-| Marmolería Externa | MARM | 5 | $0 |
-| Metalurgia Externa | META | 10 | $0 |
 
 ---
 
@@ -160,5 +110,12 @@ Manufactura → Configuración → Work Centers
 | Tipo | Cantidad |
 |------|----------|
 | Work Centers internos | 2 |
-| Work Centers externos (referencia) | 4 |
-| **Total** | **6** |
+| **Total** | **2** |
+
+---
+
+## Siguiente Paso
+
+Con los Work Centers creados, pasamos a configurar las **BoMs de Mesa**.
+
+➡️ [BoMs de Mesa](02-bom-mesa.md)

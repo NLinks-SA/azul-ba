@@ -1,6 +1,6 @@
 # 4. Operaciones y Routings
 
-Las Operaciones definen los pasos de fabricación y en qué Work Center se realizan.
+Las Operaciones definen los pasos de fabricación **internos** y en qué Work Center se realizan.
 
 ## ¿Dónde se configuran?
 
@@ -20,11 +20,9 @@ Cada BoM de Mesa debe tener estas operaciones:
 
 | # | Operación | Work Center | Duración | Descripción |
 |---|-----------|-------------|----------|-------------|
-| 10 | Inspección inicial | QC | 10 min | Verificar componentes |
-| 20 | Preparación de componentes | ENSAM | 15 min | Desembalar y preparar |
-| 30 | Ensamble tapa-base | ENSAM | 30 min | Fijar tapa a base |
-| 40 | Ajustes y nivelación | ENSAM | 15 min | Nivelar y ajustar |
-| 50 | Inspección final | QC | 10 min | Control de calidad final |
+| 10 | Ensamble Tapa + Base | ENSAM | 60 min | Fijar tapa a base |
+| 20 | Control de Calidad Final | QC | 15 min | Verificar ensamble |
+| 30 | Embalaje | ENSAM | 30 min | Embalar para entrega |
 
 ### Agregar Operación en BoM
 
@@ -36,9 +34,9 @@ Cada BoM de Mesa debe tener estas operaciones:
 
 | Campo | Valor |
 |-------|-------|
-| **Operación** | Inspección inicial |
-| **Work Center** | Control de Calidad (QC) |
-| **Duración predeterminada** | 10.00 minutos |
+| **Operación** | Ensamble Tapa + Base |
+| **Work Center** | Ensamble Final (ENSAM) |
+| **Duración predeterminada** | 60.00 minutos |
 | **Secuencia** | 10 |
 
 !!! tip "Secuencia"
@@ -46,19 +44,16 @@ Cada BoM de Mesa debe tener estas operaciones:
 
 ---
 
-## 4.2 Operaciones para Tapas Terminadas (Subcontratación)
+## 4.2 BoMs de Subcontratación - Sin Operaciones
 
-Las BoMs de subcontratación también pueden tener operaciones para planificación.
+!!! warning "Las BoMs de subcontratación NO llevan operaciones"
+    Los productos fabricados por subcontratistas (Tapa Terminada, Bases, etc.)
+    **no tienen operaciones** porque:
 
-### Secuencia de Operaciones
-
-| # | Operación | Work Center | Duración | Descripción |
-|---|-----------|-------------|----------|-------------|
-| 10 | Preparación superficie | LUST | 30 min | Lijado y preparación |
-| 20 | Aplicación de lustre | LUST | 60 min | Aplicar terminación |
-| 30 | Secado | LUST | 120 min | Tiempo de secado |
-| 40 | Pulido final | LUST | 30 min | Pulir y acabar |
-| 50 | Control de calidad | QC | 15 min | Inspección |
+    - El subcontratista hace el trabajo, no nosotros
+    - No controlamos sus procesos internos
+    - La Subcontract MO se completa automáticamente al recibir
+    - El QC se hace en el **DSC Picking**, no en operaciones
 
 ---
 
@@ -109,8 +104,8 @@ En la pestaña **Componentes** de la BoM:
 | **Consumido en operación** | Seleccionar la operación donde se consume |
 
 !!! example "Ejemplo"
-    - Tapa: consumir en "Ensamble tapa-base"
-    - Base: consumir en "Ensamble tapa-base"
+    - Tapa: consumir en "Ensamble Tapa + Base"
+    - Base: consumir en "Ensamble Tapa + Base"
 
 ---
 
@@ -132,32 +127,30 @@ Muestra:
 
 ## Verificación
 
-### Ver Operaciones de una BoM
+### Ver Operaciones de una BoM de Mesa
 
 ```
-Manufactura → Productos → Listas de materiales → [Seleccionar BoM]
+Manufactura → Productos → Listas de materiales → [Seleccionar BoM de Mesa]
 ```
 
 Pestaña **Operaciones**:
 
 | Operación | WC | Duración |
 |-----------|-----|----------|
-| Inspección inicial | QC | 10 min |
-| Preparación | ENSAM | 15 min |
-| Ensamble | ENSAM | 30 min |
-| Ajustes | ENSAM | 15 min |
-| Inspección final | QC | 10 min |
+| Ensamble Tapa + Base | ENSAM | 60 min |
+| Control de Calidad Final | QC | 15 min |
+| Embalaje | ENSAM | 30 min |
 
-**Total: ~80 min por mesa**
+**Total: ~105 min por mesa**
 
 ---
 
 ## Resumen
 
-| Tipo BoM | Operaciones | Tiempo total aprox |
-|----------|-------------|-------------------|
-| Mesa | 5 | 80 min |
-| Tapa Terminada | 5 | 255 min |
+| Tipo BoM | Operaciones | Tiempo total |
+|----------|-------------|--------------|
+| Mesa | 3 | 105 min |
+| Subcontratación | 0 | N/A (proveedor) |
 
 ---
 

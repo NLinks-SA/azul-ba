@@ -134,21 +134,17 @@ Esta BoM sí tiene componentes porque enviamos la tapa sin terminar al lustrador
 
 ---
 
-## 3.5 Operaciones en BoM de Subcontratación (Opcional)
+## 3.5 BoMs de Subcontratación - Sin Operaciones
 
-Podés agregar operaciones para:
-- Planificar tiempos
-- Ver en el Gantt
-- Costear el trabajo del proveedor
+!!! warning "Las BoMs de subcontratación NO llevan operaciones"
+    A diferencia de las BoMs de fabricación interna, las BoMs de subcontratación
+    **no tienen operaciones** porque:
 
-### Ejemplo para Tapa Terminada
-
-| Operación | Work Center | Duración |
-|-----------|-------------|----------|
-| Preparación superficie | LUST | 30 min |
-| Aplicación lustre | LUST | 60 min |
-| Secado y pulido | LUST | 30 min |
-| Control de calidad | QC | 15 min |
+    - El subcontratista hace el trabajo, no nosotros
+    - No controlamos sus procesos internos
+    - La Subcontract MO se completa automáticamente al recibir el producto
+    - El tiempo de entrega se define en el Lead Time del proveedor
+    - El QC se hace en el **DSC Picking** (ver Parte 4)
 
 ---
 

@@ -225,18 +225,8 @@ CLIENTES = [
     },
 ]
 
-# Solo Work Centers que se usan en operaciones de BoM
-# (CARP, MARM, META eliminados - los proveedores no necesitan Work Centers)
+# Work Centers internos (solo para operaciones que hacemos nosotros)
 WORK_CENTERS_CONFIG = [
-    {
-        'name': 'Lustrado y Acabados',
-        'code': 'LUST',
-        'time_efficiency': 100,
-        'time_start': 20,
-        'time_stop': 30,
-        'color': 2,
-        'note': '<p><strong>Proveedor:</strong> Lustres & Acabados Premium</p><p><strong>Lead Time:</strong> 3 días hábiles</p><p><strong>Especialidad:</strong> Lustre Mate, Brillante, Natural</p>',
-    },
     {
         'name': 'Ensamble Final',
         'code': 'ENSAM',
@@ -261,12 +251,6 @@ OPERACIONES_MESA = [
     {'name': '1. Ensamble Tapa + Base', 'workcenter_code': 'ENSAM', 'time_cycle_manual': 60, 'sequence': 10},
     {'name': '2. Control de Calidad Final', 'workcenter_code': 'QC', 'time_cycle_manual': 15, 'sequence': 20},
     {'name': '3. Embalaje', 'workcenter_code': 'ENSAM', 'time_cycle_manual': 30, 'sequence': 30},
-]
-
-OPERACIONES_LUSTRADO = [
-    {'name': '1. Preparación y Envío a Lustrador', 'workcenter_code': 'LUST', 'time_cycle_manual': 30, 'sequence': 10},
-    {'name': '2. Proceso de Lustrado (externo)', 'workcenter_code': 'LUST', 'time_cycle_manual': 480, 'sequence': 20},
-    {'name': '3. Recepción y Verificación', 'workcenter_code': 'QC', 'time_cycle_manual': 20, 'sequence': 30},
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1294,37 +1278,11 @@ for variante in mesa_variantes:
 print(f"  + {boms_creadas} BoMs creadas con operaciones")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 11. OPERACIONES PARA TAPAS DE MADERA
+# 11. CONFIGURACIÓN DE BOMS
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n" + "═"*70)
-print("11. AGREGANDO OPERACIONES A TAPAS DE MADERA")
+print("11. CONFIGURACIÓN DE BOMS")
 print("═"*70)
-
-tapa_boms = search_read('mrp.bom',
-    [['product_tmpl_id.name', 'ilike', 'Tapa Madera Terminada%'], ['type', '=', 'subcontract']],
-    ['id', 'product_id']
-)
-
-ops_creadas = 0
-for bom in tapa_boms:
-    existing_ops = search_read('mrp.routing.workcenter', [['bom_id', '=', bom['id']]], ['id'])
-    if existing_ops:
-        continue
-
-    for op in OPERACIONES_LUSTRADO:
-        wc_id = WORK_CENTERS.get(op['workcenter_code'])
-        if wc_id:
-            create('mrp.routing.workcenter', {
-                'bom_id': bom['id'],
-                'name': op['name'],
-                'workcenter_id': wc_id,
-                'time_mode': 'manual',
-                'time_cycle_manual': op['time_cycle_manual'],
-                'sequence': op['sequence'],
-            })
-    ops_creadas += 1
-
-print(f"  + {ops_creadas} BoMs de tapas con operaciones")
 
 # Configurar todas las BoMs con consumo estricto y disponibilidad requerida
 all_boms = search('mrp.bom', [])
@@ -1549,13 +1507,11 @@ print(f"""
   PLANIFICACIÓN:
   ────────────────────────────────────────────────────────────────────
   Work Centers: {total_wcs}
-    - Lustrado y Acabados (LUST) - Subcontratista
     - Ensamble Final (ENSAM) - Capacidad: 2 uds
     - Control de Calidad (QC) - Capacidad: 5 uds
 
   Operaciones: {total_ops}
     Mesa: 3 operaciones (ENSAM -> QC -> ENSAM)
-    Tapa Terminada: 3 operaciones (LUST -> LUST -> QC)
 
   LEAD TIMES:
   ────────────────────────────────────────────────────────────────────
