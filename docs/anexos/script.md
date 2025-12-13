@@ -6,13 +6,14 @@ Script Python para automatizar toda la configuración del demo.
 
 El script `setup.py` automatiza:
 
-- Configuración del sistema
-- Creación de proveedores
+- Instalación de módulos necesarios
+- Configuración del sistema (variantes, MTO, rutas, etc.)
+- Creación de proveedores con ubicaciones de subcontratación
 - Creación de productos y variantes
-- Creación de BoMs
+- Creación de BoMs (normales y subcontratación)
 - Creación de Work Centers
-- Creación de Control Points de calidad
-- Rutas MTO + Resupply Lustrador para PO automáticas en cadena (sin orderpoints)
+- Configuración de Dropship Subcontractor
+- Control de calidad en DSC Picking
 - Orden de demo para verificar el flujo
 
 ---
@@ -22,7 +23,6 @@ El script `setup.py` automatiza:
 - Python 3.8+
 - Acceso XML-RPC a la instancia de Odoo
 - Usuario con permisos de administrador
-- Módulos instalados: Sales, Inventory, Purchase, Manufacturing, Quality
 
 ---
 
@@ -34,7 +34,7 @@ El script `setup.py` automatiza:
 python setup.py
 ```
 
-Crea toda la configuración sin eliminar datos existentes.
+Instala módulos, aplica configuraciones y crea toda la demo.
 
 ### Limpiar y Recrear
 
@@ -44,11 +44,19 @@ python setup.py --limpiar
 
 Elimina los datos de demo anteriores y los recrea.
 
+### Saltar Instalación de Módulos
+
+```bash
+python setup.py --skip-install
+```
+
+Si los módulos ya están instalados, salta esa sección.
+
 ---
 
 ## Configuración
 
-Crear archivo `config.py` con las credenciales (copiar de `config.example.py`):
+Crear archivo `config.py` con las credenciales:
 
 ```python
 # config.py
@@ -68,18 +76,34 @@ ODOO_PASSWORD = "tu_password"
 ```
 setup.py
 │
+├── Instalación de Módulos
+│   ├── sale_management, purchase, mrp
+│   ├── mrp_subcontracting
+│   ├── stock_dropshipping
+│   ├── mrp_subcontracting_dropshipping
+│   └── quality_control
+│
+├── Configuración de Ajustes
+│   ├── group_product_variant (Variantes)
+│   ├── module_stock_dropshipping (Triangulación)
+│   ├── replenish_on_order (MTO)
+│   ├── group_stock_multi_locations (Ubicaciones)
+│   ├── group_stock_adv_location (Rutas multi-paso)
+│   ├── group_mrp_routings (Órdenes de trabajo)
+│   └── module_mrp_subcontracting (Subcontratación)
+│
 ├── Sección 0: Configuración Avanzada
-│   ├── Multi-step routes
-│   ├── Ubicaciones de subcontratista
-│   ├── Ubicaciones de tránsito
-│   └── Picking Type "Envío a Lustrador" + Ruta resupply
+│   ├── Almacén 1 paso (one_step / ship_only)
+│   ├── Ubicaciones de subcontratista (5 proveedores)
+│   ├── Jerarquía de ubicaciones para DSC
+│   └── Picking Type DSC configurado
 │
 ├── Sección 1: Datos Base
-│   ├── Rutas (MTO, Buy, Manufacture)
+│   ├── Rutas (MTO, Buy, Manufacture, Dropship)
 │   └── Categorías de productos
 │
 ├── Sección 2: Proveedores
-│   └── 5 proveedores con ubicaciones
+│   └── 5 proveedores con ubicaciones de subcontratación
 │
 ├── Sección 3: Clientes
 │   └── 2 clientes demo
@@ -92,17 +116,17 @@ setup.py
 │       └── Terminación (4 valores incl. Sin Terminación)
 │
 ├── Sección 5: Work Centers
-│   └── 6 centros de trabajo
+│   └── 3 centros de trabajo (LUST, ENSAM, QC)
 │
 ├── Sección 6: Bases Metálicas
-│   └── 4 productos con BoM subcontratación
+│   └── 4 productos (Buy + MTO)
 │
 ├── Sección 7: Tapas Mármol/Neolith
-│   └── 4 productos con BoM subcontratación
+│   └── 4 productos (Buy + MTO)
 │
 ├── Sección 8: Tapas de Madera
-│   ├── Tapas Sin Terminar (2 productos + Resupply Lustrador MTO)
-│   └── Tapas Terminadas (6 variantes con BoM subcontratación)
+│   ├── 8.1 Tapas Sin Terminar (Dropship)
+│   └── 8.2 Tapas Terminadas (subcontratación a Lustrador)
 │
 ├── Sección 9: Producto Final
 │   └── Mesa Comedor Premium
@@ -112,151 +136,96 @@ setup.py
 ├── Sección 10: BoMs Mesa
 │   └── 20 BoMs con operaciones
 │
-├── Sección 11: Control de Calidad
-│   └── 6 Control Points
+├── Sección 11: Operaciones BoMs
+│   └── Consumo estricto + ready_to_produce=asap
 │
-└── Sección 12: Orden de Demo
+├── Sección 12: Control de Calidad
+│   └── QC en DSC Picking para Tapas Sin Terminar
+│
+└── Sección 13: Orden de Demo
     └── SO para verificar flujo
 ```
 
 ---
 
-## Código del Script
+## Módulos Instalados
 
-```python
-#!/usr/bin/env python3
-"""
-Setup Demo Completo - Odoo 19
-Mueblería con MTO, Subcontratación y Control de Calidad
-"""
-
-import xmlrpc.client
-import argparse
-
-# === CONFIGURACIÓN ===
-URL = "http://localhost:8069"
-DB = "odoo_demo"
-USER = "admin"
-PASSWORD = "admin"
-
-# === CONEXIÓN ===
-common = xmlrpc.client.ServerProxy(f'{URL}/xmlrpc/2/common')
-uid = common.authenticate(DB, USER, PASSWORD, {})
-
-if not uid:
-    print("❌ Error de autenticación")
-    exit(1)
-
-models = xmlrpc.client.ServerProxy(f'{URL}/xmlrpc/2/object')
-
-def execute(model, method, *args, **kwargs):
-    """Ejecuta método en modelo Odoo"""
-    return models.execute_kw(DB, uid, PASSWORD, model, method, args, kwargs)
-
-def search(model, domain, **kwargs):
-    return execute(model, 'search', domain, **kwargs)
-
-def read(model, ids, fields=None):
-    return execute(model, 'read', ids, fields or [])
-
-def create(model, vals):
-    return execute(model, 'create', vals)
-
-def write(model, ids, vals):
-    return execute(model, 'write', ids, vals)
-
-def search_read(model, domain, fields=None, **kwargs):
-    return execute(model, 'search_read', domain, fields or [], **kwargs)
-
-# === FUNCIONES AUXILIARES ===
-
-def get_or_create(model, domain, vals):
-    """Busca o crea un registro"""
-    ids = search(model, domain, limit=1)
-    if ids:
-        return ids[0]
-    return create(model, vals)
-
-def get_route(route_name):
-    """Obtiene ID de ruta por nombre"""
-    routes = search_read('stock.route',
-        [('name', 'ilike', route_name)],
-        ['id', 'name'])
-    return routes[0]['id'] if routes else None
-
-# ... (resto del script)
-```
+| Módulo | Descripción |
+|--------|-------------|
+| `sale_management` | Ventas |
+| `purchase` | Compras |
+| `mrp` | Fabricación |
+| `mrp_subcontracting` | Subcontratación |
+| `stock_dropshipping` | Triangulación (Dropship) |
+| `mrp_subcontracting_dropshipping` | Dropship Subcontractor |
+| `quality_control` | Control de Calidad |
 
 ---
 
-## Descarga
+## Configuraciones Habilitadas
 
-El script completo está disponible en el repositorio:
-
-```
-/setup.py
-/config.example.py
-```
+| Configuración | Campo |
+|---------------|-------|
+| Variantes de producto | `group_product_variant` |
+| Triangulación | `module_stock_dropshipping` |
+| MTO | `replenish_on_order` |
+| Ubicaciones | `group_stock_multi_locations` |
+| Rutas multi-paso | `group_stock_adv_location` |
+| Reporte de recepción | `group_stock_reception_report` |
+| Órdenes de trabajo | `group_mrp_routings` |
+| Subcontratación | `module_mrp_subcontracting` |
 
 ---
 
-## Personalización
+## Flujo Dropship Subcontractor
 
-### Agregar Más Productos
+El script configura el flujo completo de Dropship Subcontractor:
 
-```python
-# En la sección de productos, agregar:
-nuevo_producto = {
-    'name': 'Nombre del Producto',
-    'type': 'product',
-    'default_code': 'CODIGO',
-    'route_ids': [(6, 0, [route_mto, route_buy])],
-}
-producto_id = create('product.product', nuevo_producto)
+```
+SO → MO Mesa → PO Lustrador (subcontratación)
+                            ↓ (confirmar PO)
+                 Subcontract MO (necesita Tapa Sin Terminar)
+                            ↓ (ruta Dropship)
+                 PO Carpintería → DSC Picking (con QC) → Lustrador
 ```
 
-### Agregar Más BoMs
+### Configuración Clave
 
-```python
-# Crear BoM
-bom_vals = {
-    'product_tmpl_id': producto_tmpl_id,
-    'product_qty': 1,
-    'type': 'normal',  # o 'subcontract'
-    'bom_line_ids': [
-        (0, 0, {'product_id': comp1_id, 'product_qty': 1}),
-        (0, 0, {'product_id': comp2_id, 'product_qty': 2}),
-    ]
-}
-bom_id = create('mrp.bom', bom_vals)
-```
-
-### Agregar Más Control Points
-
-```python
-# Crear Control Point
-qc_vals = {
-    'name': 'Nombre del Control',
-    'title': 'Título descriptivo',
-    'product_ids': [(6, 0, [producto_id])],
-    'picking_type_ids': [(6, 0, [picking_type_id])],
-    'test_type_id': test_type_passfail,
-    'team_id': team_id,
-}
-qc_id = create('quality.point', qc_vals)
-```
+1. **Tapa Sin Terminar**: Ruta = solo **Dropship** (sin MTO)
+2. **Picking Type DSC**: `default_location_dest_id` apunta a ubicación padre de subcontratación
+3. **QC Point**: Asociado al Picking Type DSC
 
 ---
 
 ## Verificación Post-Ejecución
 
-Después de ejecutar el script:
+Después de ejecutar el script, verificar:
 
-1. **Verificar proveedores**: Compras → Proveedores
-2. **Verificar productos**: Inventario → Productos
-3. **Verificar BoMs**: Manufactura → BoMs
-4. **Verificar QC Points**: Calidad → Control Points
-5. **Verificar orden demo**: Ventas → Pedidos
+1. **Módulos**: Apps → Verificar que todos estén instalados
+2. **Proveedores**: Compras → Proveedores (5 proveedores)
+3. **Ubicaciones**: Inventario → Configuración → Ubicaciones → Subcontratación (5 hijos)
+4. **Productos**: Inventario → Productos (Mesa + componentes)
+5. **BoMs**: Manufactura → BoMs (26 total)
+6. **QC Points**: Calidad → Control Points (1: DSC)
+7. **Demo**: Ventas → Pedidos → S00001
+
+---
+
+## URLs de Verificación
+
+El script muestra al final las URLs relevantes:
+
+```
+Productos:     {URL}/odoo/product-template
+BoMs:          {URL}/odoo/mrp-bom
+Work Centers:  {URL}/odoo/mrp-workcenter
+Gantt:         {URL}/odoo/mrp-production?view_type=gantt
+Work Orders:   {URL}/odoo/mrp-workorder
+Compras:       {URL}/odoo/purchase-order
+Ventas:        {URL}/odoo/sale-order
+Quality:       {URL}/odoo/quality-point
+Ubicaciones:   {URL}/odoo/stock-location
+```
 
 ---
 
@@ -265,10 +234,10 @@ Después de ejecutar el script:
 ### Error de conexión
 
 ```
-❌ Error de autenticación
+Error de autenticación
 ```
 
-**Solución**: Verificar URL, DB, USER y PASSWORD.
+**Solución**: Verificar URL, DB, USERNAME y PASSWORD en `config.py`.
 
 ### Error de módulo no instalado
 
@@ -276,7 +245,7 @@ Después de ejecutar el script:
 xmlrpc.client.Fault: Object 'quality.point' doesn't exist
 ```
 
-**Solución**: Instalar el módulo Quality en Odoo.
+**Solución**: Ejecutar `python setup.py` sin `--skip-install` para instalar módulos.
 
 ### Error de permisos
 
@@ -285,3 +254,11 @@ Access Denied
 ```
 
 **Solución**: Usar usuario con permisos de administrador.
+
+### Error en configuraciones
+
+```
+Error aplicando configuraciones
+```
+
+**Solución**: Algunos campos pueden no existir si los módulos no están completamente inicializados. Ejecutar el script nuevamente o aplicar configuraciones manualmente en Ajustes.

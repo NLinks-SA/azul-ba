@@ -50,95 +50,103 @@ Deberían existir las siguientes POs (en estado RFQ o confirmadas):
 
 | Proveedor | Producto | Cantidad |
 |-----------|----------|----------|
-| Carpintería Hnos. García | Tapa Madera Sin Terminar 180x90 | 1 |
 | Lustres & Acabados Premium | Tapa Madera Terminada 180x90 (Lustre Mate) | 1 |
 | Metalúrgica Precisión S.A. | Base Acero Negro 180x90 | 1 |
 
-!!! note "Cadena de Abastecimiento"
-    La PO al Lustrador es por **subcontratación**: requiere primero
-    recibir la Tapa Sin Terminar de la Carpintería, enviarla al Lustrador,
-    y luego recibir la Tapa Terminada.
+!!! note "Subcontratación"
+    La PO al Lustrador es por **subcontratación**. Al confirmarla, se creará
+    automáticamente una **Subcontract MO** que necesitará la Tapa Sin Terminar.
 
-### Verificar Detalles de PO
-
-Para cada PO, verificar:
-
-| Campo | Descripción |
-|-------|-------------|
-| **Proveedor** | Correcto según el producto |
-| **Producto** | El componente necesario |
-| **Origen** | Referencia a la MO o SO |
-| **Fecha prevista** | Calculada según lead time |
+!!! info "¿Dónde está la PO a Carpintería?"
+    La PO a Carpintería (por la Tapa Sin Terminar) **NO existe todavía**.
+    Se creará automáticamente cuando se confirme la PO al Lustrador,
+    gracias al flujo **Dropship Subcontractor**.
 
 ---
 
 ## 2.3 Confirmar las POs
 
-### Confirmar Cada PO
+### Orden de Confirmación
 
-1. Abrir la PO
+```
+1. PO Metalúrgica (Base)
+   └── Genera recepción normal
+
+2. PO Lustrador (Tapa Terminada) ← CLAVE
+   └── Al confirmar:
+       ├── Crea Subcontract MO
+       └── Subcontract MO necesita Tapa Sin Terminar (ruta Dropship)
+           └── Sistema crea PO a Carpintería automáticamente
+               └── Genera DSC Picking (Carpintería → Lustrador directo)
+```
+
+### Confirmar PO a Metalúrgica
+
+1. Abrir la PO a Metalúrgica
 2. Click en **Confirmar pedido**
-3. El estado cambia a **Orden de compra**
+3. Se genera una recepción normal
 
-### Orden de Confirmación Recomendada
+### Confirmar PO a Lustrador (Subcontratación)
 
-```
-1. PO Carpintería (Tapa Sin Terminar)
-   └── Genera recepción
-
-2. PO Metalúrgica (Base)
-   └── Genera recepción
-
-3. PO Lustrador (Tapa Terminada)
-   └── Genera recepción + envío de componentes
-```
+1. Abrir la PO a Lustres & Acabados Premium
+2. Click en **Confirmar pedido**
+3. **Automáticamente** Odoo:
+   - Crea una **Subcontract MO** para la Tapa Terminada
+   - Detecta que necesita Tapa Sin Terminar (componente de la BoM de subcontratación)
+   - La Tapa Sin Terminar tiene ruta **Dropship**
+   - Crea PO a **Carpintería** automáticamente
+   - Genera un **DSC Picking** (Dropship Subcontractor)
 
 ---
 
-## 2.4 Verificar Recepciones Generadas
+## 2.4 Verificar el Flujo Dropship Subcontractor
 
-### Acceder a Recepciones
+### Ver la PO a Carpintería (creada automáticamente)
 
 ```
-Inventario → Operaciones → Recepciones
+Compras → Pedidos → Órdenes de compra
 ```
 
-### Recepciones Esperadas
+Buscar PO a **Carpintería Hnos. García**:
 
-| Proveedor | Producto | Estado |
-|-----------|----------|--------|
-| Carpintería | Tapa Sin Terminar 180x90 | Preparado/Por hacer |
-| Metalúrgica | Base Acero Negro 180x90 | Preparado/Por hacer |
-| Lustrador | Tapa Terminada 180x90 | Esperando (componentes) |
+| Campo | Valor |
+|-------|-------|
+| **Proveedor** | Carpintería Hnos. García |
+| **Producto** | Tapa Madera Sin Terminar 180x90 |
+| **Dropship Address** | Lustres & Acabados Premium (el subcontratista) |
+
+!!! info "Dropship Address"
+    El campo `dest_address_id` (Dropship Address) indica que el proveedor
+    debe enviar el material **directamente al Lustrador**, no a nuestro almacén.
+
+### Ver el DSC Picking
+
+```
+Inventario → Operaciones → Dropship Subcontractor
+```
+
+O buscar picking con código **DSC**:
+
+| Campo | Valor |
+|-------|-------|
+| **Tipo** | Dropship Subcontractor (DSC) |
+| **Producto** | Tapa Madera Sin Terminar 180x90 |
+| **Origen** | Partners/Vendors |
+| **Destino** | Subcontract - Lustres & Acabados |
+| **Quality Check** | 🔴 Pendiente |
+
+!!! warning "¿Qué es DSC Picking?"
+    El **DSC Picking** (Dropship Subcontractor) es un movimiento especial donde
+    un proveedor envía materiales **directamente** a un subcontratista,
+    sin pasar por nuestro almacén.
+
+    ```
+    Carpintería ──(DSC)──► Lustrador (NO pasa por WH/Stock)
+    ```
 
 ---
 
-## 2.5 Flujo de Subcontratación (Lustrador)
-
-La PO al Lustrador tiene un flujo especial:
-
-```
-1. Confirmar PO al Lustrador
-         │
-         ▼
-2. Sistema reserva Tapa Sin Terminar (del stock)
-         │
-         ▼
-3. Crea movimiento de ENVÍO al subcontratista
-         │
-         ▼
-4. Al recibir Tapa Terminada, consume la Sin Terminar
-```
-
-### Ver Movimientos de Subcontratación
-
-En la PO del Lustrador:
-- Pestaña **Productos** muestra la Tapa Terminada a recibir
-- Link **Resupply** o movimiento asociado muestra el envío de componentes
-
----
-
-## Diagrama de Flujo
+## 2.5 Diagrama de Flujo Actualizado
 
 ```
         ┌─────────────────────┐
@@ -151,20 +159,34 @@ En la PO del Lustrador:
         │  Manufacturing Order │
         │   (Mesa a fabricar) │
         └─────────┬───────────┘
-                  │
-    ┌─────────────┼─────────────┐
-    │             │             │
-    ▼             ▼             ▼
-┌───────┐   ┌───────────┐   ┌───────────┐
-│  PO   │   │    PO     │   │    PO     │
-│Carpint│   │ Metalúrg  │   │ Lustrador │
-└───┬───┘   └─────┬─────┘   └─────┬─────┘
-    │             │               │
-    ▼             ▼               ▼
-┌───────┐   ┌───────────┐   ┌───────────┐
-│ Recep │   │   Recep   │   │  Recep +  │
-│Tapa ST│   │   Base    │   │ Envío Sub │
-└───────┘   └───────────┘   └───────────┘
+                  │ MTO
+    ┌─────────────┴─────────────┐
+    │                           │
+    ▼                           ▼
+┌───────────┐             ┌───────────┐
+│    PO     │             │    PO     │
+│ Metalúrg  │             │ Lustrador │ (subcontratación)
+└─────┬─────┘             └─────┬─────┘
+      │                         │
+      ▼                         ▼ Confirmar
+┌───────────┐             ┌───────────┐
+│   Recep   │             │Subcontract│
+│   Base    │             │    MO     │
+└───────────┘             └─────┬─────┘
+                                │ necesita Tapa Sin Terminar
+                                │ (ruta Dropship)
+                                ▼
+                          ┌───────────┐
+                          │    PO     │ (creada automáticamente)
+                          │Carpintería│
+                          └─────┬─────┘
+                                │
+                                ▼
+                          ┌───────────┐
+                          │    DSC    │ ← Dropship Subcontractor
+                          │  Picking  │   Carpintería → Lustrador
+                          │  + QC     │   (con Control de Calidad)
+                          └───────────┘
 ```
 
 ---
@@ -174,16 +196,16 @@ En la PO del Lustrador:
 ### Lista de Verificación
 
 - [ ] MO creada con componentes correctos
-- [ ] PO a Carpintería con Tapa Sin Terminar
-- [ ] PO a Metalúrgica con Base
-- [ ] PO a Lustrador con Tapa Terminada (subcontratación)
-- [ ] Todas las POs confirmadas
-- [ ] Recepciones pendientes visibles
+- [ ] PO a Metalúrgica confirmada
+- [ ] PO a Lustrador confirmada (subcontratación)
+- [ ] Subcontract MO creada automáticamente
+- [ ] PO a Carpintería creada automáticamente (Dropship)
+- [ ] DSC Picking visible con QC pendiente
 
 ---
 
 ## Siguiente Paso
 
-Procesar las recepciones con los controles de calidad.
+Procesar las recepciones y el DSC Picking con control de calidad.
 
-➡️ [Recepciones con QC](03-recepciones.md)
+➡️ [Recepciones y DSC](03-recepciones.md)

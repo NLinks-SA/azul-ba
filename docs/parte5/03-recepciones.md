@@ -1,149 +1,162 @@
-# 3. Recepciones con Control de Calidad
+# 3. Recepciones y Dropship Subcontractor
 
-Procesamos las recepciones de componentes, completando los controles de calidad configurados.
+Procesamos las recepciones de componentes y el DSC Picking con control de calidad.
 
-## 3.1 Acceder a Recepciones
+## Flujo General
+
+```
+                    ┌─────────────────┐
+                    │   RECEPCIONES   │
+                    └────────┬────────┘
+                             │
+       ┌─────────────────────┼─────────────────────┐
+       │                     │                     │
+       ▼                     ▼                     ▼
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│  Recepción  │       │     DSC     │       │  Recepción  │
+│    Base     │       │   Picking   │       │Tapa Termin. │
+│ (Metalúrg.) │       │  (+ QC)     │       │ (Lustrador) │
+└─────────────┘       └─────────────┘       └─────────────┘
+```
+
+!!! info "Orden de Procesamiento"
+    1. **Recepción Base** (Metalúrgica) - Sin QC configurado
+    2. **DSC Picking** (Carpintería → Lustrador) - **Con QC**
+    3. **Recepción Tapa Terminada** (Lustrador) - Después que termine de producir
+
+---
+
+## 3.1 Recepción de Base (Metalúrgica)
+
+### Acceder a Recepciones
 
 ```
 Inventario → Operaciones → Recepciones
 ```
 
-Ver recepciones pendientes (estado "Preparado" o "Por hacer").
+### Procesar Recepción
+
+1. Buscar recepción de **Metalúrgica Precisión S.A.**
+2. Verificar producto: Base Acero Negro 180x90
+3. Click en **Validar**
+4. La Base entra al stock
 
 ---
 
-## 3.2 Recepción de Tapa Sin Terminar (Carpintería)
+## 3.2 DSC Picking - Dropship Subcontractor (con QC)
 
-### Abrir la Recepción
+Este es el movimiento clave del flujo: Carpintería envía la Tapa Sin Terminar **directamente** al Lustrador.
 
-Buscar la recepción del proveedor **Carpintería Hnos. García**.
+### Acceder al DSC Picking
 
-### Quality Check Pendiente
+```
+Inventario → Operaciones → Dropship Subcontractor
+```
 
-Al abrir, debería aparecer un indicador de **Quality Check pendiente**.
+O buscar pickings con código **DSC**.
 
-| Indicador | Significado |
-|-----------|-------------|
-| 🔴 Quality Check | Hay controles pendientes |
-| Botón "Quality Checks" | Ver/completar controles |
+### Identificar el Picking
 
-### Completar el Control
+| Campo | Valor |
+|-------|-------|
+| **Referencia** | xxx/DSC/00001 |
+| **Tipo** | Dropship Subcontractor |
+| **Producto** | Tapa Madera Sin Terminar 180x90 |
+| **Desde** | Partners/Vendors |
+| **Hacia** | Subcontract - Lustres & Acabados |
+| **Quality Check** | 🔴 1 Pendiente |
 
-1. Click en **Quality Checks** o en el indicador
-2. Se abre el control **QC-REC-TAPA-CRUDA**
-3. Verificar instrucciones:
-   - Dimensiones correctas
-   - Sin grietas ni nudos excesivos
-   - Humedad de la madera en rango
-   - Sin manchas ni decoloraciones
-4. Seleccionar **Pass** o **Fail**
+### Quality Check en DSC
 
-### Si Pass
+!!! warning "Control de Calidad Obligatorio"
+    El DSC Picking tiene configurado un **Quality Point** que requiere
+    verificar la Tapa Sin Terminar antes de que llegue al Lustrador.
 
-- El check se marca como completado ✅
-- Podés validar la recepción
+    Esto es crítico porque si la madera tiene defectos, el Lustrador
+    no podrá producir una Tapa Terminada de calidad.
 
-### Si Fail
+#### Completar el Control de Calidad
 
+1. Abrir el DSC Picking
+2. Ver indicador **Quality Checks** (🔴 1)
+3. Click en **Quality Checks**
+4. Se abre el control: **QC - Recepción Tapa Madera (DSC)**
+
+#### Verificaciones a Realizar
+
+| Verificación | Criterio |
+|--------------|----------|
+| Dimensiones | 180x90 o 220x100 correctas |
+| Calidad madera | Sin nudos, grietas ni manchas |
+| Humedad | < 12% |
+| Corte | Cepillado correcto |
+| Defectos | Sin defectos visibles |
+
+#### Resultado del Control
+
+**Si PASS:**
+- El check se marca completado ✅
+- Podés validar el DSC Picking
+- La Tapa Sin Terminar llega al Lustrador
+
+**Si FAIL:**
 - Se crea una **Quality Alert**
-- Debés decidir: rechazar, aceptar con descuento, etc.
+- El envío se rechaza
+- Debe gestionarse con Carpintería
 
-### Validar Recepción
+### Validar el DSC Picking
 
-1. Verificar cantidad recibida
+1. Después de completar el QC con Pass
 2. Click en **Validar**
-3. La Tapa Sin Terminar entra al stock
+3. El movimiento se completa
+
+### Resultado
+
+```
+ANTES del DSC Picking:
+├── Partners/Vendors: Tapa Sin Terminar (virtual)
+└── Subcontract - Lustrador: 0
+
+DESPUÉS del DSC Picking:
+├── Partners/Vendors: 0
+└── Subcontract - Lustrador: Tapa Sin Terminar ✅
+```
+
+!!! info "¿Por qué es importante?"
+    Una vez validado el DSC Picking:
+    - El Lustrador tiene la materia prima
+    - La Subcontract MO puede producirse
+    - Cuando el Lustrador termina, nos envía la Tapa Terminada
 
 ---
 
-## 3.3 Recepción de Base (Metalúrgica)
+## 3.3 Recepción de Tapa Terminada (Lustrador)
 
-### Abrir la Recepción
+Después que el Lustrador produce la Tapa Terminada, la recibimos.
 
-Buscar la recepción del proveedor **Metalúrgica Precisión S.A.**
-
-### Completar Control QC-REC-BASE
-
-Verificar según instrucciones:
-- Soldaduras completas y limpias
-- Pintura sin descascarado
-- Color correcto (Negro)
-- Nivelación correcta
-- Dimensiones correctas
-
-**Pass** → Validar recepción
-
----
-
-## 3.4 Flujo de Subcontratación (Lustrador)
-
-Este es el flujo más complejo porque involucra envío de componentes.
-
-### Paso 1: Verificar Stock de Componente
-
-Antes de procesar, verificar que la Tapa Sin Terminar está en stock:
-
-```
-Inventario → Productos → Tapa Madera Sin Terminar 180x90
-```
-
-Debería mostrar stock > 0 después de la recepción de Carpintería.
-
-### Paso 2: Ver la PO del Lustrador
-
-```
-Compras → Pedidos → PO al Lustrador
-```
-
-Verificar que tiene:
-- Producto: Tapa Madera Terminada
-- Estado: Orden de compra
-
-### Paso 3: Envío al Subcontratista (si aplica)
-
-Si el sistema generó un movimiento de envío:
-
-```
-Inventario → Operaciones → Entregas
-```
-
-Buscar entrega a la **ubicación del subcontratista** (Lustrador).
-
-1. Abrir la entrega
-2. Validar el envío de la Tapa Sin Terminar
-
-!!! info "Ubicación Subcontratista"
-    La Tapa Sin Terminar se mueve a la ubicación del Lustrador
-    (creada en la configuración inicial).
-
-### Paso 4: Recibir Tapa Terminada
+### Acceder a la Recepción
 
 ```
 Inventario → Operaciones → Recepciones
 ```
 
-Buscar recepción del **Lustrador**.
+Buscar recepción de **Lustres & Acabados Premium**.
 
-### Completar Control QC-REC-TAPA-LUSTRADA
+### Procesar Recepción
 
-Verificar según instrucciones:
-- Acabado uniforme sin burbujas
-- Brillo correcto (Mate)
-- Sin rayaduras ni golpes
-- Bordes bien terminados
-
-**Pass** → Validar recepción
+1. Abrir la recepción
+2. Verificar producto: Tapa Madera Terminada 180x90 (Lustre Mate)
+3. Click en **Validar**
 
 ### Resultado
 
 - La Tapa Terminada entra al stock
-- La Tapa Sin Terminar se consume automáticamente
+- La Tapa Sin Terminar se consume automáticamente (estaba en ubicación del Lustrador)
+- La Subcontract MO se completa
 
 ---
 
-## 3.5 Ver Quality Checks Completados
-
-### Lista de Checks
+## 3.4 Verificar Quality Checks Completados
 
 ```
 Calidad → Quality Checks
@@ -151,21 +164,19 @@ Calidad → Quality Checks
 
 Filtrar por estado "Hecho":
 
-| Check | Producto | Resultado |
-|-------|----------|-----------|
-| QC-REC-TAPA-CRUDA | Tapa Sin Terminar 180x90 | Pass ✅ |
-| QC-REC-BASE | Base Acero Negro 180x90 | Pass ✅ |
-| QC-REC-TAPA-LUSTRADA | Tapa Terminada 180x90 | Pass ✅ |
+| Check | Producto | Operación | Resultado |
+|-------|----------|-----------|-----------|
+| QC - Recepción Tapa Madera (DSC) | Tapa Sin Terminar 180x90 | DSC | Pass ✅ |
 
 ---
 
-## 3.6 Ver Quality Alerts (si hubo fallas)
+## 3.5 Ver Quality Alerts (si hubo fallas)
 
 ```
 Calidad → Quality Alerts
 ```
 
-Si algún check falló, aparecerá una alerta para gestionar:
+Si el QC falló, aparecerá una alerta para gestionar:
 - Asignar responsable
 - Documentar el problema
 - Definir acciones correctivas
@@ -173,7 +184,7 @@ Si algún check falló, aparecerá una alerta para gestionar:
 
 ---
 
-## Verificación
+## Verificación Final
 
 ### Stock de Componentes
 
@@ -183,12 +194,13 @@ Inventario → Informes → Inventario
 
 | Producto | Ubicación | Cantidad |
 |----------|-----------|----------|
-| Tapa Madera Terminada 180x90 (Lustre Mate) | Stock | 1 |
-| Base Acero Negro 180x90 | Stock | 1 |
+| Tapa Madera Terminada 180x90 (Lustre Mate) | WH/Stock | 1 |
+| Base Acero Negro 180x90 | WH/Stock | 1 |
+| Tapa Madera Sin Terminar 180x90 | Subcontract - Lustrador | 0 (consumida) |
 
 ### Estado de la MO
 
-La MO debería mostrar componentes **disponibles** ahora:
+La MO principal (Mesa) debería mostrar componentes **disponibles**:
 
 | Componente | Disponible |
 |------------|------------|
@@ -197,57 +209,68 @@ La MO debería mostrar componentes **disponibles** ahora:
 
 ---
 
-## Flujo Visual
+## Flujo Visual Completo
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    RECEPCIONES                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Carpintería          Metalúrgica         Lustrador         │
-│      │                    │                   │             │
-│      ▼                    ▼                   │             │
-│  ┌───────┐           ┌───────┐               │             │
-│  │Recibir│           │Recibir│               │             │
-│  │Tapa ST│           │ Base  │               │             │
-│  └───┬───┘           └───┬───┘               │             │
-│      │                   │                   │             │
-│      ▼                   ▼                   │             │
-│  ┌───────┐           ┌───────┐               │             │
-│  │QC Pass│           │QC Pass│               │             │
-│  └───┬───┘           └───┬───┘               │             │
-│      │                   │                   │             │
-│      ▼                   ▼                   ▼             │
-│  ┌───────┐           ┌───────┐        ┌───────────┐       │
-│  │ Stock │           │ Stock │        │Enviar Tapa│       │
-│  │Tapa ST│           │ Base  │        │ST a Lust. │       │
-│  └───┬───┘           └───────┘        └─────┬─────┘       │
-│      │                                      │             │
-│      └──────────────────────────────────────┘             │
-│                         │                                  │
-│                         ▼                                  │
-│                   ┌───────────┐                            │
-│                   │  Recibir  │                            │
-│                   │Tapa Term. │                            │
-│                   └─────┬─────┘                            │
-│                         │                                  │
-│                         ▼                                  │
-│                   ┌───────────┐                            │
-│                   │  QC Pass  │                            │
-│                   └─────┬─────┘                            │
-│                         │                                  │
-│                         ▼                                  │
-│                   ┌───────────┐                            │
-│                   │   Stock   │                            │
-│                   │ Tapa Term │                            │
-│                   └───────────┘                            │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     FLUJO DE RECEPCIONES                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Metalúrgica                    Carpintería → Lustrador         │
+│      │                                │                         │
+│      ▼                                ▼                         │
+│  ┌───────┐                      ┌───────────┐                   │
+│  │Recibir│                      │    DSC    │                   │
+│  │ Base  │                      │  Picking  │                   │
+│  └───┬───┘                      └─────┬─────┘                   │
+│      │                                │                         │
+│      │                                ▼                         │
+│      │                          ┌───────────┐                   │
+│      │                          │  QC Pass  │ ← Control Calidad │
+│      │                          └─────┬─────┘                   │
+│      │                                │                         │
+│      ▼                                ▼                         │
+│  ┌───────┐                      ┌───────────┐                   │
+│  │ Stock │                      │ Lustrador │                   │
+│  │ Base  │                      │  produce  │                   │
+│  └───────┘                      └─────┬─────┘                   │
+│                                       │                         │
+│                                       ▼                         │
+│                                 ┌───────────┐                   │
+│                                 │  Recibir  │                   │
+│                                 │Tapa Term. │                   │
+│                                 └─────┬─────┘                   │
+│                                       │                         │
+│                                       ▼                         │
+│                                 ┌───────────┐                   │
+│                                 │   Stock   │                   │
+│                                 │ Tapa Term │                   │
+│                                 └───────────┘                   │
+│                                                                 │
+│                    ┌─────────────────────────┐                  │
+│                    │  MO Mesa puede producir │                  │
+│                    │  (componentes listos)   │                  │
+│                    └─────────────────────────┘                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Resumen del Flujo Dropship Subcontractor
+
+| Paso | Operación | Resultado |
+|------|-----------|-----------|
+| 1 | Confirmar PO Lustrador | Crea Subcontract MO |
+| 2 | Subcontract MO detecta componente Dropship | Crea PO Carpintería |
+| 3 | PO Carpintería genera | DSC Picking |
+| 4 | Validar DSC Picking (con QC) | Tapa Sin Terminar llega a Lustrador |
+| 5 | Lustrador produce | Tapa Terminada |
+| 6 | Recibir de Lustrador | Tapa Terminada en Stock |
 
 ---
 
 ## Siguiente Paso
 
-Con todos los componentes en stock, proceder a la producción.
+Con todos los componentes en stock, proceder a la producción de la Mesa.
 
 ➡️ [Producción](04-produccion.md)

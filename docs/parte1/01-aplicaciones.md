@@ -113,7 +113,46 @@ Al instalar las aplicaciones principales, Odoo instala automáticamente:
 | `quality_mrp` | Calidad + Manufactura |
 | `sale_mrp` | Ventas + Manufactura |
 
-!!! tip "Verificar módulos de subcontratación"
-    Ir a `Aplicaciones → Buscar "subcontract"` y verificar que esté instalado:
+---
 
-    - **MRP Subcontracting** (`mrp_subcontracting`)
+## Módulo Crítico: Dropship Subcontractor
+
+Para el flujo de envío directo entre proveedores (Carpintería → Lustrador), necesitamos instalar manualmente:
+
+### MRP Subcontracting Dropshipping
+
+```
+Nombre técnico: mrp_subcontracting_dropshipping
+```
+
+!!! warning "Instalación Manual"
+    Este módulo **NO** se instala automáticamente. Debés instalarlo manualmente:
+
+    1. Ir a **Aplicaciones**
+    2. Buscar "subcontracting dropshipping"
+    3. Instalar **MRP Subcontracting Dropshipping**
+
+Este módulo habilita:
+
+- **Dropship Subcontractor**: Envío directo de un proveedor a un subcontratista
+- **Picking Type DSC**: Nuevo tipo de operación para estos envíos
+- **Ruta automática**: Cuando un subcontratista necesita un componente con ruta Dropship
+
+!!! info "¿Qué es Dropship Subcontractor?"
+    Permite que un proveedor envíe materiales **directamente** a un subcontratista,
+    sin pasar por nuestro almacén.
+
+    Ejemplo: Carpintería envía Tapa Sin Terminar directo al Lustrador.
+
+    ```
+    Carpintería ──(DSC)──► Lustrador (NO pasa por nuestro stock)
+    ```
+
+---
+
+## Verificar Módulos de Subcontratación
+
+Ir a `Aplicaciones → Buscar "subcontract"` y verificar que estén instalados:
+
+- **MRP Subcontracting** (`mrp_subcontracting`) ✅
+- **MRP Subcontracting Dropshipping** (`mrp_subcontracting_dropshipping`) ✅

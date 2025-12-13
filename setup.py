@@ -25,13 +25,14 @@ PLANIFICACIÓN:
 - Lead Times en proveedores y BoMs
 - Capacidades de producción
 
-FLUJO DE MADERA:
-Carpintería (compra) → Lustrador (subcontratación) → Tapa Terminada → Mesa
+FLUJO DE MADERA (Dropship Subcontractor):
+SO → PO Lustrador → (confirm) → Subcontract MO → PO Carpintería → (dropship) → Lustrador
+La PO a Carpintería queda vinculada a la cadena SO/PO Lustrador para trazabilidad completa
 
 USO:
-    python setup_demo_completo.py [--limpiar]
-
-    --limpiar: Archiva productos existentes antes de crear nuevos
+    python setup.py              # Solo ejecuta setup
+    python setup.py --limpiar    # Limpia y ejecuta setup
+    python setup.py --solo-limpiar  # Solo limpia (no ejecuta setup)
 ═══════════════════════════════════════════════════════════════════════════════
 """
 
@@ -64,6 +65,31 @@ print(f"  DB: {ODOO_DB}")
 # ═══════════════════════════════════════════════════════════════════════════════
 def execute(model, method, *args, **kwargs):
     return models.execute_kw(ODOO_DB, uid, ODOO_PASSWORD, model, method, *args, **kwargs)
+
+def install_module(module_name):
+    """Instala un módulo si no está instalado"""
+    module = execute('ir.module.module', 'search_read',
+        [[['name', '=', module_name]]], {'fields': ['state']})
+    if module and module[0]['state'] == 'installed':
+        return False  # Ya instalado
+
+    # Buscar el módulo
+    module_ids = execute('ir.module.module', 'search', [[['name', '=', module_name]]])
+    if not module_ids:
+        print(f"      ✗ Módulo '{module_name}' no encontrado")
+        return False
+
+    # Instalar
+    execute('ir.module.module', 'button_immediate_install', [module_ids])
+    return True
+
+def set_config_settings(settings_dict):
+    """Aplica configuraciones via res.config.settings"""
+    # Crear nuevo registro de settings
+    settings_id = execute('res.config.settings', 'create', [settings_dict])
+    # Ejecutar set_values para aplicar
+    execute('res.config.settings', 'execute', [[settings_id]])
+    return settings_id
 
 def search(model, domain, **kwargs):
     return execute(model, 'search', [domain], kwargs)
@@ -99,24 +125,24 @@ MEDIDAS = [
 ]
 
 TERMINACIONES = [
-    {'nombre': 'Lustre Mate', 'costo_adicional': 60},
-    {'nombre': 'Lustre Brillante', 'costo_adicional': 80},
-    {'nombre': 'Natural', 'costo_adicional': 40},
+    {'nombre': 'Lustre Mate', 'costo_adicional': 90000},
+    {'nombre': 'Lustre Brillante', 'costo_adicional': 120000},
+    {'nombre': 'Natural', 'costo_adicional': 60000},
 ]
 
 # Terminaciones para Mesa (incluye opción para no-madera)
 TERMINACIONES_MESA = [
     {'nombre': 'Sin Terminación', 'costo_adicional': 0, 'aplica_madera': False},
-    {'nombre': 'Lustre Mate', 'costo_adicional': 60, 'aplica_madera': True},
-    {'nombre': 'Lustre Brillante', 'costo_adicional': 80, 'aplica_madera': True},
-    {'nombre': 'Natural', 'costo_adicional': 40, 'aplica_madera': True},
+    {'nombre': 'Lustre Mate', 'costo_adicional': 90000, 'aplica_madera': True},
+    {'nombre': 'Lustre Brillante', 'costo_adicional': 120000, 'aplica_madera': True},
+    {'nombre': 'Natural', 'costo_adicional': 60000, 'aplica_madera': True},
 ]
 
 MATERIALES_TAPA = [
     {
         'nombre': 'Mármol Carrara',
         'codigo': 'MARMOL',
-        'costo_base': 450,
+        'costo_base': 675000,
         'proveedor': 'Marmolería Del Sur',
         'requiere_terminacion': False,
         'lead_time': 7,
@@ -124,7 +150,7 @@ MATERIALES_TAPA = [
     {
         'nombre': 'Neolith Negro',
         'codigo': 'NEOLITH',
-        'costo_base': 520,
+        'costo_base': 780000,
         'proveedor': 'Neolith Argentina',
         'requiere_terminacion': False,
         'lead_time': 10,
@@ -132,7 +158,7 @@ MATERIALES_TAPA = [
     {
         'nombre': 'Madera Paraíso',
         'codigo': 'MADERA',
-        'costo_base': 200,
+        'costo_base': 300000,
         'proveedor': 'Carpintería Artesanal Hnos. García',
         'requiere_terminacion': True,
         'proveedor_terminacion': 'Lustres & Acabados Premium',
@@ -142,8 +168,8 @@ MATERIALES_TAPA = [
 ]
 
 MATERIALES_BASE = [
-    {'nombre': 'Acero Negro', 'codigo': 'NEGRO', 'costo_base': 180, 'lead_time': 5},
-    {'nombre': 'Acero Dorado', 'codigo': 'DORADO', 'costo_base': 250, 'lead_time': 5},
+    {'nombre': 'Acero Negro', 'codigo': 'NEGRO', 'costo_base': 270000, 'lead_time': 5},
+    {'nombre': 'Acero Dorado', 'codigo': 'DORADO', 'costo_base': 375000, 'lead_time': 5},
 ]
 
 PROVEEDORES = [
@@ -199,16 +225,9 @@ CLIENTES = [
     },
 ]
 
+# Solo Work Centers que se usan en operaciones de BoM
+# (CARP, MARM, META eliminados - los proveedores no necesitan Work Centers)
 WORK_CENTERS_CONFIG = [
-    {
-        'name': 'Carpintería Externa',
-        'code': 'CARP',
-        'time_efficiency': 100,
-        'time_start': 30,
-        'time_stop': 15,
-        'color': 1,
-        'note': '<p><strong>Proveedor:</strong> Carpintería Artesanal Hnos. García</p><p><strong>Lead Time:</strong> 5 días hábiles</p><p><strong>Especialidad:</strong> Tapas de madera sin terminar</p>',
-    },
     {
         'name': 'Lustrado y Acabados',
         'code': 'LUST',
@@ -217,24 +236,6 @@ WORK_CENTERS_CONFIG = [
         'time_stop': 30,
         'color': 2,
         'note': '<p><strong>Proveedor:</strong> Lustres & Acabados Premium</p><p><strong>Lead Time:</strong> 3 días hábiles</p><p><strong>Especialidad:</strong> Lustre Mate, Brillante, Natural</p>',
-    },
-    {
-        'name': 'Marmolería Externa',
-        'code': 'MARM',
-        'time_efficiency': 100,
-        'time_start': 60,
-        'time_stop': 30,
-        'color': 3,
-        'note': '<p><strong>Proveedor:</strong> Marmolería Del Sur</p><p><strong>Lead Time:</strong> 7 días hábiles</p><p><strong>Especialidad:</strong> Corte y pulido de mármol</p>',
-    },
-    {
-        'name': 'Metalurgia Externa',
-        'code': 'META',
-        'time_efficiency': 100,
-        'time_start': 45,
-        'time_stop': 20,
-        'color': 4,
-        'note': '<p><strong>Proveedor:</strong> Metalúrgica Precisión S.A.</p><p><strong>Lead Time:</strong> 5 días hábiles</p><p><strong>Especialidad:</strong> Bases de acero negro y dorado</p>',
     },
     {
         'name': 'Ensamble Final',
@@ -257,11 +258,9 @@ WORK_CENTERS_CONFIG = [
 ]
 
 OPERACIONES_MESA = [
-    {'name': '1. Recepción y Verificación de Tapa', 'workcenter_code': 'QC', 'time_cycle_manual': 30, 'sequence': 10},
-    {'name': '2. Recepción y Verificación de Base', 'workcenter_code': 'QC', 'time_cycle_manual': 20, 'sequence': 20},
-    {'name': '3. Ensamble Tapa + Base', 'workcenter_code': 'ENSAM', 'time_cycle_manual': 60, 'sequence': 30},
-    {'name': '4. Control de Calidad Final', 'workcenter_code': 'QC', 'time_cycle_manual': 15, 'sequence': 40},
-    {'name': '5. Embalaje para Entrega', 'workcenter_code': 'ENSAM', 'time_cycle_manual': 30, 'sequence': 50},
+    {'name': '1. Ensamble Tapa + Base', 'workcenter_code': 'ENSAM', 'time_cycle_manual': 60, 'sequence': 10},
+    {'name': '2. Control de Calidad Final', 'workcenter_code': 'QC', 'time_cycle_manual': 15, 'sequence': 20},
+    {'name': '3. Embalaje', 'workcenter_code': 'ENSAM', 'time_cycle_manual': 30, 'sequence': 30},
 ]
 
 OPERACIONES_LUSTRADO = [
@@ -271,123 +270,89 @@ OPERACIONES_LUSTRADO = [
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# LIMPIEZA OPCIONAL
+# INSTALACIÓN DE MÓDULOS Y CONFIGURACIÓN INICIAL
+# ───────────────────────────────────────────────────────────────────────────────
+# Esta sección instala los módulos necesarios y habilita las configuraciones
+# requeridas para el flujo completo de la demo.
 # ═══════════════════════════════════════════════════════════════════════════════
-if '--limpiar' in sys.argv:
+if '--skip-install' not in sys.argv:
+    print("\n" + "═"*70)
+    print("INSTALACIÓN DE MÓDULOS")
+    print("═"*70)
+
+    # Módulos requeridos para la demo
+    MODULOS_REQUERIDOS = [
+        'sale_management',                    # Ventas
+        'purchase',                           # Compras
+        'mrp',                                # Fabricación
+        'mrp_subcontracting',                 # Subcontratación
+        'stock_dropshipping',                 # Triangulación (Dropship)
+        'mrp_subcontracting_dropshipping',    # Dropship Subcontractor
+        'quality_control',                    # Control de Calidad
+    ]
+
+    for modulo in MODULOS_REQUERIDOS:
+        print(f"  Verificando {modulo}...", end=" ")
+        try:
+            if install_module(modulo):
+                print("✓ Instalado")
+            else:
+                print("- Ya instalado")
+        except Exception as e:
+            print(f"✗ Error: {str(e)[:40]}")
+
+    print("\n" + "═"*70)
+    print("CONFIGURACIÓN DE AJUSTES")
+    print("═"*70)
+
+    # Habilitar configuraciones necesarias
+    print("  Aplicando configuraciones del sistema...")
+    try:
+        set_config_settings({
+            # Variantes de producto
+            'group_product_variant': True,
+            # Triangulación (Dropship)
+            'module_stock_dropshipping': True,
+            # MTO - Reabastecer sobre pedido
+            'replenish_on_order': True,
+            # Ubicaciones de almacenamiento
+            'group_stock_multi_locations': True,
+            # Rutas multi-paso
+            'group_stock_adv_location': True,
+            # Reporte de recepción
+            'group_stock_reception_report': True,
+            # Control de calidad
+            'module_quality_control': True,
+            # Órdenes de trabajo (MRP)
+            'group_mrp_routings': True,
+            # Subcontratación
+            'module_mrp_subcontracting': True,
+        })
+        print("      ✓ Variantes de producto habilitadas")
+        print("      ✓ Triangulación (Dropship) habilitada")
+        print("      ✓ MTO (Reabastecer sobre pedido) habilitado")
+        print("      ✓ Ubicaciones de almacenamiento habilitadas")
+        print("      ✓ Rutas multi-paso habilitadas")
+        print("      ✓ Reporte de recepción habilitado")
+        print("      ✓ Control de calidad habilitado")
+        print("      ✓ Órdenes de trabajo habilitadas")
+        print("      ✓ Subcontratación habilitada")
+    except Exception as e:
+        print(f"      ✗ Error aplicando configuraciones: {str(e)[:50]}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LIMPIEZA OPCIONAL
+# ───────────────────────────────────────────────────────────────────────────────
+# Solo limpia productos y sus dependencias directas (MOs, BoMs, orderpoints).
+# El resto (rutas, picking types, ubicaciones, work centers) se maneja
+# idempotentemente en el setup (get_or_create, reactivación de archivados).
+# ═══════════════════════════════════════════════════════════════════════════════
+if '--limpiar' in sys.argv or '--solo-limpiar' in sys.argv:
     print("\n" + "═"*70)
     print("LIMPIANDO DATOS EXISTENTES")
     print("═"*70)
 
-    # Cancelar y eliminar MOs
-    mos = search('mrp.production', [['state', 'not in', ['done', 'cancel']]])
-    if mos:
-        try:
-            execute('mrp.production', 'action_cancel', [mos])
-            execute('mrp.production', 'unlink', [mos])
-            print(f"  {len(mos)} órdenes de fabricación eliminadas")
-        except Exception as e:
-            print(f"  No se pudieron eliminar MOs: {str(e)[:50]}")
-
-    # Cancelar y eliminar POs
-    pos = search('purchase.order', [['state', 'not in', ['done', 'cancel']]])
-    if pos:
-        try:
-            execute('purchase.order', 'button_cancel', [pos])
-            execute('purchase.order', 'unlink', [pos])
-            print(f"  {len(pos)} órdenes de compra eliminadas")
-        except Exception as e:
-            print(f"  No se pudieron eliminar POs: {str(e)[:50]}")
-
-    # Eliminar SOs en draft
-    sos = search('sale.order', [['state', '=', 'draft']])
-    if sos:
-        execute('sale.order', 'unlink', [sos])
-        print(f"  {len(sos)} cotizaciones eliminadas")
-
-    # Eliminar Work Orders
-    wos = search('mrp.workorder', [])
-    if wos:
-        try:
-            execute('mrp.workorder', 'unlink', [wos])
-            print(f"  {len(wos)} work orders eliminadas")
-        except:
-            pass
-
-    # Eliminar operaciones de BoM
-    ops = search('mrp.routing.workcenter', [])
-    if ops:
-        execute('mrp.routing.workcenter', 'unlink', [ops])
-        print(f"  {len(ops)} operaciones eliminadas")
-
-    # Eliminar capacidades
-    caps = search('mrp.workcenter.capacity', [])
-    if caps:
-        execute('mrp.workcenter.capacity', 'unlink', [caps])
-        print(f"  {len(caps)} capacidades eliminadas")
-
-    # Archivar work centers (no eliminar por logs de productividad)
-    wcs = search('mrp.workcenter', [])
-    if wcs:
-        write('mrp.workcenter', wcs, {'active': False})
-        print(f"  {len(wcs)} work centers archivados")
-
-    # Eliminar Quality Points de demo
-    qc_points = search('quality.point', [['name', 'ilike', 'QC-%']])
-    if qc_points:
-        execute('quality.point', 'unlink', [qc_points])
-        print(f"  {len(qc_points)} quality points eliminados")
-
-    # Eliminar Orderpoints de demo (Tapas Sin Terminar)
-    orderpoints = search('stock.warehouse.orderpoint', [['product_id.name', 'ilike', 'Tapa Madera Sin Terminar%']])
-    if orderpoints:
-        execute('stock.warehouse.orderpoint', 'unlink', [orderpoints])
-        print(f"  {len(orderpoints)} orderpoints eliminados")
-
-    # Archivar ruta y reglas de Resupply Lustrador (no se pueden eliminar si hay stock.moves)
-    resupply_routes = search('stock.route', [['name', 'ilike', 'Resupply Lustrador%']])
-    if resupply_routes:
-        # Archivar las reglas primero
-        rules = search('stock.rule', [['route_id', 'in', resupply_routes]])
-        if rules:
-            try:
-                execute('stock.rule', 'unlink', [rules])
-            except:
-                write('stock.rule', rules, {'active': False})
-        try:
-            execute('stock.route', 'unlink', [resupply_routes])
-        except:
-            write('stock.route', resupply_routes, {'active': False})
-        print(f"  {len(resupply_routes)} rutas de resupply archivadas/eliminadas")
-
-    # Archivar Picking Type de Envío a Lustrador (no se puede eliminar si hay stock.rules)
-    lustrador_pt = search('stock.picking.type', [['name', 'ilike', '%Envío a Lustrador%']])
-    if lustrador_pt:
-        try:
-            execute('stock.picking.type', 'unlink', [lustrador_pt])
-        except:
-            write('stock.picking.type', lustrador_pt, {'active': False})
-        print(f"  {len(lustrador_pt)} picking types archivados/eliminados")
-
-    # Eliminar secuencias de Lustrador
-    lust_seq = search('ir.sequence', [['code', '=', 'stock.picking.lustrador']])
-    if lust_seq:
-        execute('ir.sequence', 'unlink', [lust_seq])
-        print(f"  {len(lust_seq)} secuencias eliminadas")
-
-    # Eliminar ubicaciones de subcontratación y tránsito creadas
-    custom_locs = search('stock.location', [
-        '|',
-        ['name', 'ilike', 'Subcontract -%'],
-        ['name', 'ilike', 'Transit:%']
-    ])
-    if custom_locs:
-        try:
-            execute('stock.location', 'unlink', [custom_locs])
-            print(f"  {len(custom_locs)} ubicaciones personalizadas eliminadas")
-        except:
-            pass  # Pueden tener movimientos
-
-    # Archivar productos de demo
+    # Buscar productos de demo
     productos_demo = search('product.template', [
         '|', '|', '|', '|',
         ['name', 'ilike', 'Mesa Comedor%'],
@@ -396,8 +361,28 @@ if '--limpiar' in sys.argv:
         ['default_code', 'ilike', 'MESA-%'],
         ['default_code', 'ilike', 'TAPA-%'],
     ])
+
     if productos_demo:
-        # Primero eliminar BoMs
+        # Cancelar y eliminar MOs de productos demo
+        mos = search('mrp.production', [
+            ['product_id.product_tmpl_id', 'in', productos_demo],
+            ['state', 'not in', ['done', 'cancel']]
+        ])
+        if mos:
+            try:
+                execute('mrp.production', 'action_cancel', [mos])
+                execute('mrp.production', 'unlink', [mos])
+                print(f"  {len(mos)} órdenes de fabricación eliminadas")
+            except Exception as e:
+                print(f"  No se pudieron eliminar MOs: {str(e)[:50]}")
+
+        # Eliminar orderpoints de productos demo
+        orderpoints = search('stock.warehouse.orderpoint', [['product_id.product_tmpl_id', 'in', productos_demo]])
+        if orderpoints:
+            execute('stock.warehouse.orderpoint', 'unlink', [orderpoints])
+            print(f"  {len(orderpoints)} orderpoints eliminados")
+
+        # Eliminar BoMs de productos demo
         boms = search('mrp.bom', [['product_tmpl_id', 'in', productos_demo]])
         if boms:
             execute('mrp.bom', 'unlink', [boms])
@@ -406,6 +391,13 @@ if '--limpiar' in sys.argv:
         write('product.template', productos_demo, {'active': False})
         print(f"  {len(productos_demo)} productos archivados")
 
+# Si es solo limpieza, terminar aquí
+if '--solo-limpiar' in sys.argv:
+    print("\n" + "═"*70)
+    print("LIMPIEZA COMPLETADA")
+    print("═"*70)
+    sys.exit(0)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 0. CONFIGURACIÓN AVANZADA (Multi-step routes, Ubicaciones, QC)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -413,22 +405,46 @@ print("\n" + "═"*70)
 print("0. CONFIGURACIÓN AVANZADA DEL SISTEMA")
 print("═"*70)
 
-# 0.1 Multi-step routes en almacén
-print("\n  0.1 Configurando Multi-step Routes...")
-warehouse = search_read('stock.warehouse', [], ['id', 'name', 'reception_steps', 'delivery_steps'])
+# 0.1 Configurar almacén con 1 paso (simplificado)
+print("\n" + "  0.1 Configurando Almacén (1 paso)...")
+warehouse = search_read('stock.warehouse', [], ['id', 'name', 'reception_steps', 'delivery_steps', 'lot_stock_id'])
 if warehouse:
     wh = warehouse[0]
-    if wh['reception_steps'] != 'three_steps' or wh['delivery_steps'] != 'pick_pack_ship':
+
+    # Antes de cambiar a 1-step, vaciar ubicaciones intermedias
+    if wh['reception_steps'] != 'one_step' or wh['delivery_steps'] != 'ship_only':
+        # Buscar todas las ubicaciones intermedias del almacén que podrían tener stock
+        intermediate_locs = search_read('stock.location', [
+            '|', '|', '|', '|',
+            ['name', 'ilike', 'Quality Control'],
+            ['name', 'ilike', 'Input'],
+            ['name', 'ilike', 'Output'],
+            ['name', 'ilike', 'Pack'],
+            ['name', 'ilike', 'Pick'],
+        ], ['id', 'name'])
+
+        for loc in intermediate_locs:
+            quants = search('stock.quant', [
+                ['location_id', '=', loc['id']],
+                ['quantity', '!=', 0]
+            ])
+
+            if quants:
+                print(f"      Vaciando {len(quants)} quants de {loc['name']}...")
+                # Poner cantidades en cero para poder desactivar la ubicación
+                write('stock.quant', quants, {'quantity': 0})
+
+    if wh['reception_steps'] != 'one_step' or wh['delivery_steps'] != 'ship_only':
         write('stock.warehouse', [wh['id']], {
-            'reception_steps': 'three_steps',  # Input → Quality Control → Stock
-            'delivery_steps': 'pick_pack_ship',  # Pick → Pack → Ship
+            'reception_steps': 'one_step',   # Recepción directa a Stock
+            'delivery_steps': 'ship_only',   # Envío directo desde Stock
         })
-        print(f"      ✓ Almacén {wh['name']}: three_steps / pick_pack_ship")
+        print(f"      ✓ Almacén {wh['name']}: one_step / ship_only")
     else:
         print(f"      - Almacén {wh['name']}: ya configurado")
 
 # 0.2 Ubicaciones de subcontratista
-print("\n  0.2 Creando ubicaciones de subcontratista...")
+print("\n" + "  0.2 Creando ubicaciones de subcontratista...")
 
 # IMPORTANTE: Las ubicaciones de subcontratista deben ser hijas de "Subcontratación"
 # para que la ruta "Subcontratista de reabastecimiento" funcione correctamente
@@ -452,115 +468,96 @@ subcontract_locs = [
     ('NEOL', 'Subcontract - Neolith Argentina'),
 ]
 for code, name in subcontract_locs:
-    loc_id, created = get_or_create('stock.location',
-        [['name', '=', name]],
-        {'name': name, 'usage': 'internal', 'location_id': SUBCONTRACT_PARENT_ID, 'barcode': code}
-    )
-    # Asegurar que el parent sea correcto (en caso de que exista con parent incorrecto)
-    if not created:
-        write('stock.location', [loc_id], {'location_id': SUBCONTRACT_PARENT_ID})
+    # Buscar incluyendo archivadas (pueden haber sido archivadas en limpieza)
+    existing = search_read('stock.location', [['name', '=', name], '|', ['active', '=', True], ['active', '=', False]], ['id', 'active'])
+    if existing:
+        loc_id = existing[0]['id']
+        # Reactivar si estaba archivada y asegurar parent correcto
+        write('stock.location', [loc_id], {'active': True, 'location_id': SUBCONTRACT_PARENT_ID})
+        print(f"      ✓ {name}")
+    else:
+        loc_id = create('stock.location', {
+            'name': name, 'usage': 'internal', 'location_id': SUBCONTRACT_PARENT_ID, 'barcode': code
+        })
+        print(f"      + {name}")
     SUBCONTRACT_LOCATIONS[code] = loc_id
-    if created:
-        print(f"      + {name}")
-    else:
-        print(f"      ✓ {name} (parent corregido)")
 
-# 0.3 Ubicaciones de tránsito entre proveedores
-print("\n  0.3 Creando ubicaciones de tránsito...")
-transit_parent = search_read('stock.location', [['usage', '=', 'transit'], ['location_id', '=', False]], ['id'])
-if not transit_parent:
-    TRANSIT_PARENT_ID = create('stock.location', {'name': 'Transit Locations', 'usage': 'transit'})
+# 0.2.1 Corregir jerarquía de ubicaciones para rutas Dropship/Resupply
+# ═══════════════════════════════════════════════════════════════════════════════
+# IMPORTANTE: Odoo puede crear múltiples ubicaciones "Subcontratación" desconectadas.
+# Las reglas de stock (Dropship, Resupply Subcontractor) deben apuntar a la misma
+# ubicación padre que contiene las ubicaciones de los subcontratistas.
+# Si no coinciden, el flujo de Dropship Subcontractor no funciona porque el código
+# de _adjust_procure_method sube la jerarquía de ubicaciones y no encuentra las reglas.
+# ═══════════════════════════════════════════════════════════════════════════════
+print("\n" + "  0.2.1 Corrigiendo jerarquía de ubicaciones para Dropship Subcontractor...")
+
+# Verificar si la compañía tiene configurada una ubicación de subcontratación diferente
+companies = search_read('res.company', [], ['id', 'name', 'subcontracting_location_id'])
+for company in companies:
+    company_sub_loc = company.get('subcontracting_location_id')
+    if company_sub_loc and company_sub_loc[0] != SUBCONTRACT_PARENT_ID:
+        # La compañía usa una ubicación diferente - actualizar
+        print(f"      Compañía '{company['name']}': actualizando subcontracting_location_id")
+        print(f"        [{company_sub_loc[0]}] → [{SUBCONTRACT_PARENT_ID}]")
+        write('res.company', [company['id']], {'subcontracting_location_id': SUBCONTRACT_PARENT_ID})
+
+        # También actualizar todas las reglas que usan la ubicación incorrecta
+        old_loc_id = company_sub_loc[0]
+
+        # Reglas con location_src_id incorrecto
+        rules_src = search_read('stock.rule', [['location_src_id', '=', old_loc_id]], ['id', 'name'])
+        for rule in rules_src:
+            write('stock.rule', [rule['id']], {'location_src_id': SUBCONTRACT_PARENT_ID})
+            print(f"      ✓ Regla '{rule['name']}': location_src_id corregido")
+
+        # Reglas con location_dest_id incorrecto
+        rules_dest = search_read('stock.rule', [['location_dest_id', '=', old_loc_id]], ['id', 'name'])
+        for rule in rules_dest:
+            write('stock.rule', [rule['id']], {'location_dest_id': SUBCONTRACT_PARENT_ID})
+            print(f"      ✓ Regla '{rule['name']}': location_dest_id corregido")
+
+        if not rules_src and not rules_dest:
+            print(f"      (sin reglas que corregir)")
+    elif company_sub_loc:
+        print(f"      Compañía '{company['name']}': jerarquía correcta")
+    else:
+        # Configurar la ubicación si no está configurada
+        print(f"      Compañía '{company['name']}': configurando subcontracting_location_id")
+        write('res.company', [company['id']], {'subcontracting_location_id': SUBCONTRACT_PARENT_ID})
+
+# 0.2.2 Corregir Picking Type "Dropship Subcontractor" (DSC)
+# ═══════════════════════════════════════════════════════════════════════════════
+# El Picking Type DSC debe tener default_location_dest_id apuntando a la misma
+# ubicación padre (SUBCONTRACT_PARENT_ID) que contiene las ubicaciones específicas
+# de los subcontratistas.
+#
+# Si usa una ubicación diferente, los pickings DSC irán a "Subcontratación" genérica
+# en lugar de "Subcontratación/Subcontract - Lustrador" (ubicación específica).
+#
+# El código de purchase.py._get_destination_location() usa dest_address_id para
+# obtener la ubicación específica del subcontratista, pero solo funciona si
+# la ubicación padre es correcta.
+# ═══════════════════════════════════════════════════════════════════════════════
+print("\n" + "  0.2.2 Corrigiendo Picking Type 'Dropship Subcontractor' (DSC)...")
+
+dsc_picking_type = search_read('stock.picking.type', [['sequence_code', '=', 'DSC']],
+    ['id', 'name', 'default_location_dest_id'])
+
+if dsc_picking_type:
+    pt = dsc_picking_type[0]
+    current_dest = pt.get('default_location_dest_id')
+    if current_dest and current_dest[0] != SUBCONTRACT_PARENT_ID:
+        write('stock.picking.type', [pt['id']], {'default_location_dest_id': SUBCONTRACT_PARENT_ID})
+        print(f"      ✓ Picking Type '{pt['name']}': default_location_dest_id corregido")
+        print(f"        [{current_dest[0]}] → [{SUBCONTRACT_PARENT_ID}]")
+    elif current_dest:
+        print(f"      Picking Type '{pt['name']}': ubicación correcta")
+    else:
+        write('stock.picking.type', [pt['id']], {'default_location_dest_id': SUBCONTRACT_PARENT_ID})
+        print(f"      ✓ Picking Type '{pt['name']}': default_location_dest_id configurado")
 else:
-    TRANSIT_PARENT_ID = transit_parent[0]['id']
-
-transit_locs = [
-    ('TR-CARP-LUST', 'Transit: Carpintería → Lustrador'),
-    ('TR-LUST-FAB', 'Transit: Lustrador → Fábrica'),
-    ('TR-META-FAB', 'Transit: Metalúrgica → Fábrica'),
-    ('TR-MARM-FAB', 'Transit: Marmolería → Fábrica'),
-]
-TRANSIT_LOCATIONS = {}
-for code, name in transit_locs:
-    loc_id, created = get_or_create('stock.location',
-        [['name', '=', name]],
-        {'name': name, 'usage': 'transit', 'location_id': TRANSIT_PARENT_ID, 'barcode': code}
-    )
-    TRANSIT_LOCATIONS[code] = loc_id
-    if created:
-        print(f"      + {name}")
-
-# 0.4 Picking Type y Ruta para transferencias visibles a Lustrador
-print("\n  0.4 Configurando transferencias visibles a subcontratistas...")
-
-# Obtener datos del almacén
-wh_data = search_read('stock.warehouse', [], ['id', 'code', 'lot_stock_id', 'int_type_id'])
-WH_ID = wh_data[0]['id'] if wh_data else 1
-WH_CODE = wh_data[0]['code'] if wh_data else 'WH'
-WH_STOCK_LOC = wh_data[0]['lot_stock_id'][0] if wh_data and wh_data[0]['lot_stock_id'] else 1
-WH_INT_TYPE = wh_data[0]['int_type_id'][0] if wh_data and wh_data[0]['int_type_id'] else None
-
-# Crear Picking Type para envío a Lustrador
-PICKING_TYPE_LUSTRADOR = None
-if 'LUST' in SUBCONTRACT_LOCATIONS:
-    picking_type_name = f'{WH_CODE}: Envío a Lustrador'
-    existing_pt = search_read('stock.picking.type', [['name', '=', picking_type_name]], ['id'])
-
-    if existing_pt:
-        PICKING_TYPE_LUSTRADOR = existing_pt[0]['id']
-        print(f"      - Existe: {picking_type_name}")
-    else:
-        # Obtener secuencia
-        seq_id = create('ir.sequence', {
-            'name': f'Sequence Envío Lustrador',
-            'code': 'stock.picking.lustrador',
-            'prefix': f'{WH_CODE}/LUST/',
-            'padding': 5,
-        })
-
-        PICKING_TYPE_LUSTRADOR = create('stock.picking.type', {
-            'name': picking_type_name,
-            'code': 'internal',
-            'sequence_code': 'INT',
-            'warehouse_id': WH_ID,
-            'default_location_src_id': WH_STOCK_LOC,
-            'default_location_dest_id': SUBCONTRACT_LOCATIONS['LUST'],
-            'sequence_id': seq_id,
-        })
-        print(f"      + Creado: {picking_type_name}")
-
-# Crear Ruta para Resupply Lustrador
-RUTA_RESUPPLY_LUST = None
-if PICKING_TYPE_LUSTRADOR and 'LUST' in SUBCONTRACT_LOCATIONS:
-    route_name = 'Resupply Lustrador (Transfer Visible)'
-    existing_route = search_read('stock.route', [['name', '=', route_name]], ['id'])
-
-    if existing_route:
-        RUTA_RESUPPLY_LUST = existing_route[0]['id']
-        print(f"      - Existe: {route_name}")
-    else:
-        RUTA_RESUPPLY_LUST = create('stock.route', {
-            'name': route_name,
-            'product_selectable': True,
-            'product_categ_selectable': False,
-            'warehouse_selectable': False,
-            'active': True,
-        })
-
-        # Crear regla de stock para mover de Stock → Lustrador
-        # IMPORTANTE: procure_method='make_to_order' propaga la demanda al route Buy
-        # Esto genera automáticamente la PO a Carpintería cuando hay demanda
-        create('stock.rule', {
-            'name': 'Stock → Lustrador (MTO Transfer)',
-            'route_id': RUTA_RESUPPLY_LUST,
-            'location_src_id': WH_STOCK_LOC,
-            'location_dest_id': SUBCONTRACT_LOCATIONS['LUST'],
-            'action': 'pull',
-            'picking_type_id': PICKING_TYPE_LUSTRADOR,
-            'procure_method': 'make_to_order',  # Propaga demanda → genera PO
-            'auto': 'manual',  # Transfer requiere validación manual (visible)
-        })
-        print(f"      + Creada: {route_name}")
-        print(f"        -> Regla: Stock → Lustrador (transfer manual)")
+    print("      (Picking Type DSC no encontrado - se creará con el módulo)")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 1. DATOS BASE
@@ -578,11 +575,15 @@ rutas = search_read('stock.route', ['|', ['active', '=', True], ['active', '=', 
 RUTA_MANUFACTURE = next((r['id'] for r in rutas if 'manufacture' in r['name'].lower()), None)
 RUTA_BUY = next((r['id'] for r in rutas if 'buy' in r['name'].lower()), None)
 RUTA_MTO = next((r['id'] for r in rutas if 'mto' in r['name'].lower() or 'replenish on order' in r['name'].lower()), None)
+RUTA_RESUPPLY_SUBCONTRACTOR = next((r['id'] for r in rutas if 'subcontratista de reabastecimiento' in r['name'].lower()), None)
+RUTA_DROPSHIP = next((r['id'] for r in rutas if r['name'].lower() == 'dropship'), None)
 
 print(f"  UoM: {UOM_ID}")
 print(f"  Ruta Manufacture: {RUTA_MANUFACTURE}")
 print(f"  Ruta Buy: {RUTA_BUY}")
 print(f"  Ruta MTO: {RUTA_MTO}")
+print(f"  Ruta Resupply Subcontractor: {RUTA_RESUPPLY_SUBCONTRACTOR}")
+print(f"  Ruta Dropship: {RUTA_DROPSHIP}")
 
 # Activar y configurar rutas
 if RUTA_MTO:
@@ -593,11 +594,8 @@ if RUTA_BUY:
 if RUTA_MANUFACTURE:
     write('stock.route', [RUTA_MANUFACTURE], {'product_selectable': True})
 
-# NOTA: NO se necesita la ruta "Resupply Subcontractor" de Odoo
-# Nuestra ruta "Resupply Lustrador" con procure_method='make_to_order' hace el trabajo
-
 # Categorías
-print("\n  Creando categorías...")
+print("\n" + "  Creando categorías...")
 cat_all = search_read('product.category', [['name', '=', 'All']], ['id'])
 CAT_PARENT = cat_all[0]['id'] if cat_all else 1
 
@@ -630,7 +628,7 @@ for prov in PROVEEDORES:
     print(f"  {'+ Creado' if created else '- Existe'}: {prov['name']}")
 
 # Asociar ubicaciones de subcontratación a proveedores
-print("\n  Asociando ubicaciones de subcontratación...")
+print("\n" + "  Asociando ubicaciones de subcontratación...")
 PROV_LOC_MAP = {
     'Carpintería Artesanal Hnos. García': 'CARP',
     'Lustres & Acabados Premium': 'LUST',
@@ -717,7 +715,7 @@ for med in MEDIDAS:
     ATTR_VALUES[f"Medidas|{med['nombre']}"] = val_id
     print(f"      - {med['nombre']}")
 
-# Terminación (para Tapas de madera)
+# Terminación (para Tapas de madera y Mesa)
 attr_id, _ = get_or_create('product.attribute', [['name', '=', 'Terminación']], {
     'name': 'Terminación', 'create_variant': 'always', 'display_type': 'radio'
 })
@@ -761,7 +759,7 @@ for wc in WORK_CENTERS_CONFIG:
     print(f"  {'+ Creado' if created else '- Existe'}: {wc['name']} ({wc['code']})")
 
 # Configurar capacidades
-print("\n  Configurando capacidades...")
+print("\n" + "  Configurando capacidades...")
 
 capacity_id, created = get_or_create('mrp.workcenter.capacity',
     [['workcenter_id', '=', WORK_CENTERS['ENSAM']], ['product_id', '=', False]],
@@ -827,22 +825,15 @@ for base_mat in MATERIALES_BASE:
         variant_id = variant[0]['id'] if variant else None
         BASES[(base_mat['nombre'], medida['codigo'])] = variant_id
 
-        if created:
-            prov_id = PROVEEDOR_IDS.get('Metalúrgica Precisión S.A.')
-            if prov_id:
-                get_or_create('product.supplierinfo',
-                    [['product_tmpl_id', '=', tmpl_id], ['partner_id', '=', prov_id]],
-                    {'partner_id': prov_id, 'product_tmpl_id': tmpl_id, 'price': costo, 'delay': base_mat['lead_time']}
-                )
-
-                bom_id = create('mrp.bom', {
-                    'product_tmpl_id': tmpl_id,
-                    'product_id': variant_id,
-                    'product_qty': 1,
-                    'type': 'subcontract',
-                    'subcontractor_ids': [(6, 0, [prov_id])],
-                    'produce_delay': base_mat['lead_time'],
-                })
+        # Configurar proveedor (Metalúrgica)
+        # NO crear BoM - las bases son compra directa sin subcontratación
+        # (el proveedor no necesita componentes nuestros)
+        prov_id = PROVEEDOR_IDS.get('Metalúrgica Precisión S.A.')
+        if prov_id:
+            get_or_create('product.supplierinfo',
+                [['product_tmpl_id', '=', tmpl_id], ['partner_id', '=', prov_id]],
+                {'partner_id': prov_id, 'product_tmpl_id': tmpl_id, 'price': costo, 'delay': base_mat['lead_time']}
+            )
 
         print(f"  {'+ Creada' if created else '- Existe'}: {nombre}")
 
@@ -910,8 +901,26 @@ print("═"*70)
 
 mat_madera = next(m for m in MATERIALES_TAPA if m['requiere_terminacion'])
 
-# 8.1 Tapas SIN terminar
-print("\n  8.1 Tapas SIN terminar (compra a Carpintería):")
+# 8.1 Tapas SIN terminar (componente para Lustrador)
+# ═══════════════════════════════════════════════════════════════════════════════
+# FLUJO DROPSHIP DIRECTO: Carpintería → Lustrador (1 paso)
+#
+# La ruta "Dropship" configura automáticamente el flujo:
+# 1. Cuando se confirma PO al Lustrador, se crea Subcontract MO
+# 2. El Subcontract MO necesita componentes (Tapa Sin Terminar)
+# 3. Gracias a la ruta Dropship, se genera PO a Carpintería automáticamente
+# 4. El picking es DSC (Dropship Subcontractor): Vendors → Subcontratación
+#    Va DIRECTO al Lustrador sin pasar por Stock
+# 5. La PO a Carpintería queda vinculada al origen (Lustrador/SO)
+#
+# IMPORTANTE:
+# - Solo usar ruta Dropship (sin MTO)
+# - Si se agrega MTO, la regla "Stock → Subcontratación" tiene prioridad
+#   y el flujo pasa por Stock (2 pasos) en lugar de ir directo (1 paso)
+# - Las ubicaciones de subcontratación deben estar correctamente
+#   jerarquizadas (ver sección 0.2.1)
+# ═══════════════════════════════════════════════════════════════════════════════
+print("\n" + "  8.1 Tapas SIN terminar (componente para Lustrador - Dropship):")
 TAPAS_SIN_TERMINAR = {}
 
 for medida in MEDIDAS:
@@ -919,10 +928,12 @@ for medida in MEDIDAS:
     codigo = f"TAPA-MADERA-RAW-{medida['codigo'].replace('x', '')}"
     costo = mat_madera['costo_base'] * medida['factor_precio']
 
-    # Rutas: Buy + MTO + Resupply Lustrador
-    # La ruta "Resupply Lustrador" tiene procure_method='make_to_order'
-    # Esto propaga el MTO y genera automáticamente la PO a Carpintería (sin orderpoints)
-    rutas_componente = [r for r in [RUTA_BUY, RUTA_MTO, RUTA_RESUPPLY_LUST] if r]
+    # Rutas: SOLO Dropship (sin MTO)
+    # La ruta Dropship tiene regla "Vendors → Subcontratación" con procure_method: mts_else_mto
+    # que ya maneja "si no hay stock, crear orden de compra"
+    # Si se agrega MTO, la regla "Stock → Subcontratación" de MTO tiene prioridad
+    # y el flujo pasa por Stock en lugar de ir directo
+    rutas_componente = [RUTA_DROPSHIP] if RUTA_DROPSHIP else []
 
     tmpl_id, created = get_or_create('product.template',
         [['default_code', '=', codigo]],
@@ -940,7 +951,7 @@ for medida in MEDIDAS:
         }
     )
 
-    # Asegurar rutas si ya existe (incluyendo nueva ruta de resupply)
+    # Asegurar rutas si ya existe
     if not created and rutas_componente:
         write('product.template', [tmpl_id], {'route_ids': [(6, 0, rutas_componente)]})
 
@@ -958,12 +969,8 @@ for medida in MEDIDAS:
 
     print(f"      {'+ Creada' if created else '- Existe'}: {nombre}")
 
-# NOTA: NO se necesitan orderpoints para Tapas Sin Terminar
-# La ruta "Resupply Lustrador" con procure_method='make_to_order' propaga el MTO
-# y genera automáticamente la PO a Carpintería
-
 # 8.2 Tapas CON terminación
-print("\n  8.2 Tapas CON terminación (subcontratación a Lustrador):")
+print("\n" + "  8.2 Tapas CON terminación (subcontratación a Lustrador):")
 TAPAS_TERMINADAS = {}
 
 lustrador_id = PROVEEDOR_IDS.get(mat_madera['proveedor_terminacion'])
@@ -974,7 +981,8 @@ rutas_componente = [r for r in [RUTA_BUY, RUTA_MTO] if r]
 for medida in MEDIDAS:
     nombre_base = f"Tapa Madera Terminada {medida['codigo']}"
     codigo_base = f"TAPA-MADERA-TERM-{medida['codigo'].replace('x', '')}"
-    precio_terminada = (mat_madera['costo_base'] + 80) * medida['factor_precio']
+    costo_terminacion_promedio = 90000
+    precio_terminada = (mat_madera['costo_base'] + costo_terminacion_promedio) * medida['factor_precio']
 
     existing = search_read('product.template', [['default_code', '=', codigo_base]], ['id'])
 
@@ -993,7 +1001,7 @@ for medida in MEDIDAS:
             'is_storable': True,
             'categ_id': CATEGORIAS['Tapas'],
             'list_price': precio_terminada,
-            'standard_price': (mat_madera['costo_base'] + 60) * medida['factor_precio'],
+            'standard_price': (mat_madera['costo_base'] + 60000) * medida['factor_precio'],
             'uom_id': UOM_ID,
             'purchase_ok': True,  # Necesario para generar PO automática
             'sale_ok': False,
@@ -1082,7 +1090,7 @@ else:
         'default_code': MESA_CODIGO,
         'is_storable': True,
         'categ_id': CATEGORIAS['Mesas'],
-        'list_price': 1500,
+        'list_price': 2250000,
         'uom_id': UOM_ID,
         'purchase_ok': False,
         'sale_ok': True,
@@ -1093,10 +1101,9 @@ else:
     print(f"  + Mesa creada (ID: {mesa_tmpl_id})")
 
     # Orden de atributos: Material Tapa → Terminación → Material Base → Medidas
-    # Terminación va después de Material Tapa para mejor UX (las exclusiones filtran opciones)
     atributos_orden = [
         ('Material Tapa', 10),
-        ('Terminación', 20),  # Justo después del material para ver opciones filtradas
+        ('Terminación', 20),
         ('Material Base', 30),
         ('Medidas', 40),
     ]
@@ -1116,6 +1123,7 @@ else:
         print(f"    -> Atributo: {attr_name} (seq: {sequence})")
 
 # Asegurar rutas Manufacture + MTO (fabricación bajo pedido)
+rutas_mesa = [r for r in [RUTA_MANUFACTURE, RUTA_MTO] if r]
 write('product.template', [mesa_tmpl_id], {
     'route_ids': [(6, 0, rutas_mesa)] if rutas_mesa else [],
     'sale_delay': 14,
@@ -1130,7 +1138,7 @@ print(f"\n  Total variantes de Mesa: {len(mesa_variantes)}")
 # ═══════════════════════════════════════════════════════════════════════════════
 # 9.1 EXCLUSIONES DE ATRIBUTOS (Terminación solo visible para Madera)
 # ═══════════════════════════════════════════════════════════════════════════════
-print("\n  Configurando exclusiones de atributos...")
+print("\n" + "  Configurando exclusiones de atributos...")
 
 # Obtener los product.template.attribute.value (PTAV) para Mesa
 mesa_ptavs = search_read('product.template.attribute.value',
@@ -1318,104 +1326,79 @@ for bom in tapa_boms:
 
 print(f"  + {ops_creadas} BoMs de tapas con operaciones")
 
+# Configurar todas las BoMs con consumo estricto y disponibilidad requerida
+all_boms = search('mrp.bom', [])
+if all_boms:
+    write('mrp.bom', all_boms, {
+        'consumption': 'strict',
+        'ready_to_produce': 'asap',  # MO lista cuando componentes de 1ra operación están disponibles
+    })
+    print(f"  + {len(all_boms)} BoMs: consumo estricto + ready_to_produce=asap")
+
 # ═══════════════════════════════════════════════════════════════════════════════
-# 12. CONTROL POINTS DE CALIDAD
+# 12. CONTROL DE CALIDAD EN DROPSHIP SUBCONTRACTOR
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n" + "═"*70)
-print("12. CONFIGURANDO CONTROL POINTS DE CALIDAD")
+print("12. CONTROL DE CALIDAD (DSC - Dropship Subcontractor)")
 print("═"*70)
 
-# Obtener IDs necesarios
-quality_team = search_read('quality.alert.team', [], ['id'], limit=1)
-QUALITY_TEAM_ID = quality_team[0]['id'] if quality_team else 1
+# Buscar Picking Type DSC (Dropship Subcontractor)
+dsc_picking_type = search_read('stock.picking.type', [
+    ['sequence_code', '=', 'DSC']
+], ['id', 'name'])
 
-picking_types = search_read('stock.picking.type', [], ['id', 'code'])
-RECEIPTS_PT = next((pt['id'] for pt in picking_types if pt['code'] == 'incoming'), None)
-MFG_PT = next((pt['id'] for pt in picking_types if pt['code'] == 'mrp_operation'), None)
+# Buscar productos Tapa Madera Sin Terminar
+tapas_sin_terminar = search_read('product.product', [
+    ['name', 'ilike', 'Tapa Madera Sin Terminar%']
+], ['id', 'name'])
 
-test_types = search_read('quality.point.test_type', [['technical_name', '=', 'passfail']], ['id'])
-PASSFAIL_TEST = test_types[0]['id'] if test_types else 7
+# Buscar test type Pass/Fail
+passfail_type = search('quality.point.test_type', [['technical_name', '=', 'passfail']])
 
-# Obtener productos para los control points
-tapas_sin_terminar = search_read('product.product', [['name', 'ilike', 'Tapa Madera Sin Terminar%']], ['id'])
-tapas_terminadas = search_read('product.product', [['name', 'ilike', 'Tapa Madera Terminada%']], ['id'])
-bases_productos = search_read('product.product', [['name', 'ilike', 'Base Acero%']], ['id'])
-tapas_marmol = search_read('product.product', [['name', 'ilike', 'Tapa Mármol%']], ['id'])
-tapas_neolith = search_read('product.product', [['name', 'ilike', 'Tapa Neolith%']], ['id'])
-mesas_productos = search_read('product.product', [['name', 'ilike', 'Mesa Comedor%']], ['id'])
+if dsc_picking_type and tapas_sin_terminar and passfail_type:
+    dsc_pt_id = dsc_picking_type[0]['id']
+    product_ids = [t['id'] for t in tapas_sin_terminar]
 
-# Definir Control Points
-QUALITY_POINTS = [
-    {
-        'name': 'QC-REC-TAPA-CRUDA',
-        'title': 'Control Recepción Tapas Sin Terminar',
-        'products': tapas_sin_terminar,
-        'picking_type': RECEIPTS_PT,
-        'note': '<p>Verificar:<br/>- Dimensiones correctas<br/>- Sin grietas ni nudos excesivos<br/>- Humedad de la madera</p>',
-    },
-    {
-        'name': 'QC-REC-TAPA-LUSTRADA',
-        'title': 'Control Recepción Tapas Lustradas',
-        'products': tapas_terminadas,
-        'picking_type': RECEIPTS_PT,
-        'note': '<p>Verificar:<br/>- Acabado uniforme sin burbujas<br/>- Brillo según especificación<br/>- Sin marcas ni rayaduras</p>',
-    },
-    {
-        'name': 'QC-REC-BASE',
-        'title': 'Control Recepción Bases Metálicas',
-        'products': bases_productos,
-        'picking_type': RECEIPTS_PT,
-        'note': '<p>Verificar:<br/>- Soldaduras completas y limpias<br/>- Pintura sin descascarado<br/>- Nivelación correcta</p>',
-    },
-    {
-        'name': 'QC-REC-MARMOL',
-        'title': 'Control Recepción Tapas Mármol',
-        'products': tapas_marmol,
-        'picking_type': RECEIPTS_PT,
-        'note': '<p>Verificar:<br/>- Sin fisuras ni grietas<br/>- Pulido uniforme<br/>- Veteado según muestra aprobada</p>',
-    },
-    {
-        'name': 'QC-REC-NEOLITH',
-        'title': 'Control Recepción Tapas Neolith',
-        'products': tapas_neolith,
-        'picking_type': RECEIPTS_PT,
-        'note': '<p>Verificar:<br/>- Espesor uniforme<br/>- Bordes sin astillado<br/>- Color según especificación</p>',
-    },
-    {
-        'name': 'QC-MFG-ENSAMBLE',
-        'title': 'Control Pre-Ensamblado Mesa',
-        'products': mesas_productos,
-        'picking_type': MFG_PT,
-        'note': '<p>Verificar antes de ensamblar:<br/>- Componentes completos<br/>- Tapa y base compatibles en medida<br/>- Sin defectos visibles</p>',
-    },
-]
-
-qc_creados = 0
-for qc in QUALITY_POINTS:
-    if not qc['products'] or not qc['picking_type']:
-        continue
     qc_id, created = get_or_create('quality.point',
-        [['name', '=', qc['name']]],
+        [['name', '=', 'QC - Recepción Tapa Madera (DSC)']],
         {
-            'name': qc['name'],
-            'title': qc['title'],
-            'product_ids': [(6, 0, [p['id'] for p in qc['products']])],
-            'picking_type_ids': [(6, 0, [qc['picking_type']])],
-            'measure_on': 'operation' if 'MFG' in qc['name'] else 'product',
-            'measure_frequency_type': 'all',
-            'test_type_id': PASSFAIL_TEST,
-            'team_id': QUALITY_TEAM_ID,
-            'note': qc['note'],
-            'failure_message': '<p>Rechazar y notificar al proveedor</p>',
+            'name': 'QC - Recepción Tapa Madera (DSC)',
+            'title': 'Control de Calidad - Tapa Madera Sin Terminar',
+            'picking_type_ids': [(6, 0, [dsc_pt_id])],
+            'product_ids': [(6, 0, product_ids)],
+            'test_type_id': passfail_type[0],
+            'measure_on': 'move_line',
+            'note': '''<p><strong>Control de calidad al recibir Tapa Madera en el Lustrador:</strong></p>
+<p>Verificar la tapa de madera SIN terminar antes de aceptar el envío.</p>
+<ul>
+    <li>Dimensiones correctas (180x90 o 220x100)</li>
+    <li>Calidad de la madera (sin nudos, grietas)</li>
+    <li>Humedad adecuada (&lt;12%)</li>
+    <li>Sin defectos visibles</li>
+    <li>Corte y cepillado correctos</li>
+</ul>
+<p><strong>Si NO pasa el QC, rechazar el envío.</strong></p>''',
         }
     )
     if created:
-        qc_creados += 1
-        print(f"  + {qc['title']}")
+        print(f"  + QC - Recepción Tapa Madera (DSC) creado")
+        print(f"    → Aplica al Picking Type: Dropship Subcontractor (DSC)")
+        print(f"    → Productos: {len(tapas_sin_terminar)} tapas sin terminar")
     else:
-        print(f"  - {qc['title']} (existente)")
-
-print(f"\n  Total: {qc_creados} Control Points creados")
+        # Actualizar para asegurar configuración correcta
+        write('quality.point', [qc_id], {
+            'picking_type_ids': [(6, 0, [dsc_pt_id])],
+            'product_ids': [(6, 0, product_ids)],
+        })
+        print(f"  ✓ QC - Recepción Tapa Madera (DSC) actualizado")
+else:
+    print("  ! No se pudo crear QC (faltan datos)")
+    if not dsc_picking_type:
+        print("    - Falta Picking Type DSC")
+    if not tapas_sin_terminar:
+        print("    - Faltan productos Tapa Madera Sin Terminar")
+    if not passfail_type:
+        print("    - Falta test type Pass/Fail")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 13. ORDEN DE DEMO (MTO genera MO y POs automáticamente)
@@ -1516,15 +1499,14 @@ print("═"*70)
 total_boms = len(search('mrp.bom', []))
 total_wcs = len(search('mrp.workcenter', []))
 total_ops = len(search('mrp.routing.workcenter', []))
-total_qc = len(search('quality.point', []))
 
 print(f"""
   CONFIGURACIÓN AVANZADA:
   ────────────────────────────────────────────────────────────────────
-  Almacén: Multi-step Routes (three_steps / pick_pack_ship)
+  Almacén: 1 paso (one_step / ship_only)
   Ubicaciones Subcontratista: 5 (por proveedor)
-  Ubicaciones Tránsito: 4 (entre proveedores)
-  Quality Control Points: {total_qc}
+  Dropship Subcontractor: Habilitado (DSC Picking Type configurado)
+  Control de Calidad: QC en validación de DSC Picking
 
   PRODUCTOS:
   ────────────────────────────────────────────────────────────────────
@@ -1535,30 +1517,29 @@ print(f"""
     - Madera + Lustre (Mate/Brillante/Natural): 12 variantes
 
   Tapas Mármol/Neolith: 4 productos
-  Tapas Madera Sin Terminar: 2 productos (MTO → PO automática)
-  Tapas Madera Terminadas: 6 variantes (con terminación)
+  Tapas Madera Sin Terminar: 2 productos (Dropship a Lustrador)
+  Tapas Madera Terminadas: 6 variantes (subcontratación)
   Bases Metálicas: 4 productos
 
-  RUTAS MTO (Replenish on Order):
+  RUTAS:
   ────────────────────────────────────────────────────────────────────
   Mesa:                  Manufacture + MTO
   Bases:                 Buy + MTO
   Tapas Simples:         Buy + MTO
   Tapas Madera:          Buy + MTO
-  Tapa Sin Terminar:     Buy + MTO + Resupply Lustrador
+  Tapa Sin Terminar:     Dropship (envío directo a Lustrador)
 
-  Flujo automático (MTO puro, sin orderpoints):
-  Venta → MO Mesa → PO Lustrador → SBC MO → Move (MTO) → PO Carpintería
-
-  TRANSFERENCIA VISIBLE A SUBCONTRATISTA:
+  FLUJO DROPSHIP SUBCONTRACTOR (Madera):
   ────────────────────────────────────────────────────────────────────
-  Picking Type: "Envío a Lustrador"
-  Ruta: "Resupply Lustrador (Transfer Visible)"
-  Ubicación: Inventario → Operaciones → Traslados internos
+  SO → MO Mesa → PO Lustrador (subcontratación)
+                            ↓ (confirmar PO)
+                 Subcontract MO (necesita Tapa Sin Terminar)
+                            ↓ (ruta Dropship)
+                 PO Carpintería → DSC Picking → Lustrador
 
   SELECCIÓN DE TERMINACIÓN:
   ────────────────────────────────────────────────────────────────────
-  Al crear una venta de Mesa, el usuario ahora puede elegir:
+  Al crear una venta de Mesa, el usuario puede elegir:
   - Material Tapa: Mármol Carrara, Neolith Negro, Madera Paraíso
   - Material Base: Acero Negro, Acero Dorado
   - Medidas: 180x90 cm, 220x100 cm
@@ -1568,15 +1549,12 @@ print(f"""
   PLANIFICACIÓN:
   ────────────────────────────────────────────────────────────────────
   Work Centers: {total_wcs}
-    - Carpintería Externa (CARP)
-    - Lustrado y Acabados (LUST)
-    - Marmolería Externa (MARM)
-    - Metalurgia Externa (META)
+    - Lustrado y Acabados (LUST) - Subcontratista
     - Ensamble Final (ENSAM) - Capacidad: 2 uds
     - Control de Calidad (QC) - Capacidad: 5 uds
 
   Operaciones: {total_ops}
-    Mesa: 5 operaciones (QC -> ENSAM -> QC -> ENSAM)
+    Mesa: 3 operaciones (ENSAM -> QC -> ENSAM)
     Tapa Terminada: 3 operaciones (LUST -> LUST -> QC)
 
   LEAD TIMES:
@@ -1591,17 +1569,17 @@ print(f"""
   | Ensamble Mesa          | 1 día     |
   | Entrega al cliente     | 14 días   |
 
-  FLUJO DE MADERA (con transferencia visible):
+  FLUJO DE MADERA (Dropship Subcontractor):
   ────────────────────────────────────────────────────────────────────
 
-  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-  │   CARPINTERÍA   │     │   WH/STOCK      │     │     LUSTRADOR       │     │     STOCK       │
-  │   Hnos. García  │────>│   (Recepción)   │────>│  Lustres & Acabados │────>│   Disponible    │
-  └─────────────────┘     └─────────────────┘     └─────────────────────┘     └─────────────────┘
-         │                       │                         │                         │
-    Tapa Madera           Tapa Sin Terminar         Tapa Madera               Tapa Madera
-    SIN Terminar          en Stock                  CON Terminación           Terminada
-    (Compra PO)           (Envío a Lustrador)       (Subcontratación)         (Para MO Mesa)
+  ┌─────────────────┐                      ┌─────────────────────┐     ┌─────────────────┐
+  │   CARPINTERÍA   │   Picking: DSC       │     LUSTRADOR       │     │     STOCK       │
+  │   Hnos. García  │═════════════════════>│  Lustres & Acabados │────>│   Disponible    │
+  │                 │   (dropship + QC)    │                     │     │                 │
+  │   Tapa Madera   │                      │   (produce Tapa     │     │   (Tapa         │
+  │   SIN Terminar  │   QC al validar →    │    Terminada)       │     │    Terminada)   │
+  │                 │   Pass/Fail          │                     │     │                 │
+  └─────────────────┘                      └─────────────────────┘     └─────────────────┘
 
   ════════════════════════════════════════════════════════════════════
 

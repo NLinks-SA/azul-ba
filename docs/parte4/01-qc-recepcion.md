@@ -1,6 +1,14 @@
-# 1. Control Points en Recepción
+# 1. Control de Calidad en Dropship Subcontractor
 
-Configuramos controles de calidad automáticos para cuando recibimos productos de proveedores.
+Configuramos control de calidad automático para cuando se valida el picking DSC (Dropship Subcontractor).
+
+## ¿Cuándo se dispara el QC?
+
+El control de calidad se activa al validar el picking **DSC** (Dropship Subcontractor), que es cuando la Tapa Madera Sin Terminar llega de Carpintería al Lustrador.
+
+```
+PO Carpintería → DSC Picking (aquí se hace QC) → Lustrador
+```
 
 ## Acceder a Control Points
 
@@ -10,30 +18,29 @@ Calidad → Control Points → Nuevo
 
 ---
 
-## 1.1 Crear: QC Recepción Tapas Sin Terminar
+## 1.1 Crear: QC - Recepción Tapa Madera (DSC)
 
-Este control se activa al recibir tapas de madera de la Carpintería.
+Este control se activa al validar el picking DSC con tapas de madera sin terminar.
 
 ### Información Principal
 
 | Campo | Valor |
 |-------|-------|
-| **Título** | Control Recepción Tapas Sin Terminar |
-| **Referencia** | QC-REC-TAPA-CRUDA |
+| **Nombre** | QC - Recepción Tapa Madera (DSC) |
+| **Título** | Control de Calidad - Tapa Madera Sin Terminar |
 
 ### Alcance
 
 | Campo | Valor |
 |-------|-------|
 | **Productos** | Tapa Madera Sin Terminar 180x90, Tapa Madera Sin Terminar 220x100 |
-| **Categorías de producto** | (dejar vacío si seleccionaste productos) |
-| **Tipos de operación** | Recepciones (Receipts) |
+| **Tipos de operación** | Dropship Subcontractor (DSC) |
 
-!!! info "Tipos de Operación"
-    Seleccionar el tipo de operación **Recepciones** (o Receipts).
+!!! info "Tipo de Operación DSC"
+    Seleccionar el tipo de operación **Dropship Subcontractor** (código DSC).
 
-    Esto hace que el control se active SOLO en recepciones,
-    no en otros movimientos internos.
+    Este picking type se crea automáticamente al instalar el módulo
+    `mrp_subcontracting_dropshipping`.
 
 ### Configuración del Control
 
@@ -49,161 +56,16 @@ Este control se activa al recibir tapas de madera de la Carpintería.
 En el campo **Nota** o **Instructions**:
 
 ```html
-<p>Verificar:</p>
+<p><strong>Control de calidad al recibir Tapa Madera en el Lustrador:</strong></p>
+<p>Verificar la tapa de madera SIN terminar antes de aceptar el envío.</p>
 <ul>
-  <li>Dimensiones correctas según orden</li>
-  <li>Sin grietas ni nudos excesivos</li>
-  <li>Humedad de la madera dentro de rango</li>
-  <li>Sin manchas ni decoloraciones</li>
+    <li>Dimensiones correctas (180x90 o 220x100)</li>
+    <li>Calidad de la madera (sin nudos, grietas)</li>
+    <li>Humedad adecuada (&lt;12%)</li>
+    <li>Sin defectos visibles</li>
+    <li>Corte y cepillado correctos</li>
 </ul>
-```
-
-### Mensaje de Falla
-
-En **Failure Message**:
-
-```html
-<p>Rechazar lote y notificar a Carpintería Hnos. García</p>
-```
-
-**Guardar**
-
----
-
-## 1.2 Crear: QC Recepción Tapas Lustradas
-
-Control para tapas terminadas que vienen del Lustrador.
-
-### Información Principal
-
-| Campo | Valor |
-|-------|-------|
-| **Título** | Control Recepción Tapas Lustradas |
-| **Referencia** | QC-REC-TAPA-LUSTRADA |
-
-### Alcance
-
-| Campo | Valor |
-|-------|-------|
-| **Productos** | Todas las variantes de Tapa Madera Terminada |
-| **Tipos de operación** | Recepciones |
-
-### Configuración
-
-| Campo | Valor |
-|-------|-------|
-| **Tipo de test** | Pass - Fail |
-| **Control per** | Product |
-| **Control Frequency** | All |
-
-### Instrucciones
-
-```html
-<p>Verificar:</p>
-<ul>
-  <li>Acabado uniforme sin burbujas ni marcas</li>
-  <li>Brillo según especificación (Mate/Brillante/Natural)</li>
-  <li>Sin rayaduras ni golpes</li>
-  <li>Bordes bien terminados</li>
-</ul>
-```
-
-**Guardar**
-
----
-
-## 1.3 Crear: QC Recepción Bases Metálicas
-
-### Información Principal
-
-| Campo | Valor |
-|-------|-------|
-| **Título** | Control Recepción Bases Metálicas |
-| **Referencia** | QC-REC-BASE |
-
-### Alcance
-
-| Campo | Valor |
-|-------|-------|
-| **Productos** | Todas las Bases Acero (4 productos) |
-| **Tipos de operación** | Recepciones |
-
-### Instrucciones
-
-```html
-<p>Verificar:</p>
-<ul>
-  <li>Soldaduras completas y limpias</li>
-  <li>Pintura sin descascarado ni burbujas</li>
-  <li>Color correcto (Negro/Dorado)</li>
-  <li>Nivelación correcta (no balancea)</li>
-  <li>Dimensiones según especificación</li>
-</ul>
-```
-
-**Guardar**
-
----
-
-## 1.4 Crear: QC Recepción Mármol
-
-### Información Principal
-
-| Campo | Valor |
-|-------|-------|
-| **Título** | Control Recepción Tapas Mármol |
-| **Referencia** | QC-REC-MARMOL |
-
-### Alcance
-
-| Campo | Valor |
-|-------|-------|
-| **Productos** | Tapa Mármol Carrara 180x90, Tapa Mármol Carrara 220x100 |
-| **Tipos de operación** | Recepciones |
-
-### Instrucciones
-
-```html
-<p>Verificar:</p>
-<ul>
-  <li>Sin fisuras ni grietas</li>
-  <li>Pulido uniforme</li>
-  <li>Veteado según muestra aprobada</li>
-  <li>Bordes bien terminados</li>
-  <li>Espesor correcto</li>
-</ul>
-```
-
-**Guardar**
-
----
-
-## 1.5 Crear: QC Recepción Neolith
-
-### Información Principal
-
-| Campo | Valor |
-|-------|-------|
-| **Título** | Control Recepción Tapas Neolith |
-| **Referencia** | QC-REC-NEOLITH |
-
-### Alcance
-
-| Campo | Valor |
-|-------|-------|
-| **Productos** | Tapa Neolith Negro 180x90, Tapa Neolith Negro 220x100 |
-| **Tipos de operación** | Recepciones |
-
-### Instrucciones
-
-```html
-<p>Verificar:</p>
-<ul>
-  <li>Espesor uniforme</li>
-  <li>Bordes sin astillado</li>
-  <li>Color negro uniforme</li>
-  <li>Superficie sin defectos</li>
-</ul>
+<p><strong>Si NO pasa el QC, rechazar el envío.</strong></p>
 ```
 
 **Guardar**
@@ -218,31 +80,69 @@ Control para tapas terminadas que vienen del Lustrador.
 Calidad → Control Points
 ```
 
-| Referencia | Título | Productos | Operación |
-|------------|--------|-----------|-----------|
-| QC-REC-TAPA-CRUDA | Control Recepción Tapas Sin Terminar | 2 | Recepciones |
-| QC-REC-TAPA-LUSTRADA | Control Recepción Tapas Lustradas | 6 | Recepciones |
-| QC-REC-BASE | Control Recepción Bases Metálicas | 4 | Recepciones |
-| QC-REC-MARMOL | Control Recepción Tapas Mármol | 2 | Recepciones |
-| QC-REC-NEOLITH | Control Recepción Tapas Neolith | 2 | Recepciones |
+| Nombre | Productos | Operación |
+|--------|-----------|-----------|
+| QC - Recepción Tapa Madera (DSC) | 2 | Dropship Subcontractor |
 
 ---
 
 ## Cómo Funciona
 
-Cuando llegue una recepción:
+Cuando se valida un picking DSC con Tapa Madera Sin Terminar:
 
-1. Usuario va a **Inventario → Recepciones**
-2. Abre la recepción pendiente
+1. Usuario va a **Inventario → Operaciones → Dropship Subcontractor**
+2. Abre el picking pendiente (ej: `ptest-scripting/DSC/00001`)
 3. Antes de validar, aparece **Quality Check** pendiente
 4. Click en el check → Completa Pass/Fail
-5. Si Pass → Puede validar recepción
-6. Si Fail → Se crea Quality Alert
+5. Si **Pass** → Puede validar el picking, material llega al Lustrador
+6. Si **Fail** → Se crea Quality Alert, el envío se rechaza
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Carpintería   │────▶│  DSC Picking    │────▶│   Lustrador     │
+│                 │     │   + QC Check    │     │                 │
+│   Tapa Madera   │     │   Pass/Fail     │     │   (produce)     │
+│   Sin Terminar  │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+---
+
+## Flujo Completo con QC
+
+```
+1. SO Mesa Madera
+      │
+      ▼
+2. MO Mesa (MTO)
+      │
+      ▼
+3. PO Lustrador (subcontratación)
+      │
+      ▼ (confirmar PO)
+4. Subcontract MO
+      │
+      ▼ (necesita Tapa Sin Terminar - ruta Dropship)
+5. PO Carpintería
+      │
+      ▼ (confirmar PO)
+6. DSC Picking + QC ◄── Control de Calidad aquí
+      │
+      ▼ (si Pass)
+7. Tapa llega a Lustrador
+      │
+      ▼
+8. Lustrador produce Tapa Terminada
+      │
+      ▼
+9. MO Mesa puede continuar
+```
 
 ---
 
 ## Resumen
 
-| Control Points de Recepción | 5 |
-|---------------------------|---|
-| Productos cubiertos | 16 |
+| Control Points | 1 |
+|----------------|---|
+| Productos cubiertos | 2 (Tapas Sin Terminar) |
+| Tipo de operación | Dropship Subcontractor (DSC) |

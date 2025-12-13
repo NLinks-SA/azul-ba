@@ -117,7 +117,7 @@ Todas con rutas: **Buy + MTO**
 
 ## 3.3 Tapas de Madera - Sin Terminar
 
-Estas tapas se compran a Carpintería y luego van al Lustrador.
+Estas tapas se compran a Carpintería y van **directo** al Lustrador mediante **Dropship Subcontractor**.
 
 ### Crear: Tapa Madera Sin Terminar 180x90
 
@@ -126,25 +126,33 @@ Estas tapas se compran a Carpintería y luego van al Lustrador.
 | Campo | Valor |
 |-------|-------|
 | **Nombre** | Tapa Madera Sin Terminar 180x90 |
-| **Referencia interna** | TAPA-MADERA-ST-18090 |
+| **Referencia interna** | TAPA-MADERA-RAW-18090 |
 | **Tipo de producto** | Almacenable |
-| **Coste** | 120.00 |
+| **Coste** | 300000 |
 
 #### Pestaña: Compra
 
 | Proveedor | Precio | Tiempo de entrega |
 |-----------|--------|-------------------|
-| Carpintería Artesanal Hnos. García | 120.00 | 5 días |
+| Carpintería Artesanal Hnos. García | 300000 | 5 días |
 
 #### Pestaña: Inventario
 
 | Campo | Valor |
 |-------|-------|
-| **Rutas** | ☑ Buy, ☑ Replenish on Order (MTO), ☑ Resupply Lustrador |
+| **Rutas** | ☑ Dropship |
 
-!!! info "Ruta Resupply Lustrador"
-    Esta ruta se crea en [Parte 1 - Configuración de Inventario](../parte1/02-config-inventario.md#25-crear-ruta-resupply-lustrador).
-    Es necesaria para propagar el MTO y generar automáticamente la PO a Carpintería.
+!!! info "Ruta Dropship para Dropship Subcontractor"
+    Solo necesitamos la ruta **Dropship**. Cuando el Lustrador (subcontratista) necesite
+    este componente, Odoo automáticamente:
+
+    1. Crea una PO a Carpintería
+    2. Genera un picking DSC (Dropship Subcontractor)
+    3. El envío va directo de Carpintería → Lustrador (sin pasar por nuestro almacén)
+
+!!! warning "NO agregar MTO"
+    Si agregamos MTO, la regla "Stock → Subcontratación" tiene mayor prioridad
+    y el flujo pasaría por nuestro stock en lugar de ir directo.
 
 **Guardar**
 
@@ -154,9 +162,9 @@ Estas tapas se compran a Carpintería y luego van al Lustrador.
 
 | Producto | Código | Costo | Proveedor | Lead Time |
 |----------|--------|-------|-----------|-----------|
-| Tapa Madera Sin Terminar 220x100 | TAPA-MADERA-ST-22010 | 150.00 | Carpintería Artesanal Hnos. García | 5 días |
+| Tapa Madera Sin Terminar 220x100 | TAPA-MADERA-RAW-22010 | 420000 | Carpintería Artesanal Hnos. García | 5 días |
 
-Con las mismas rutas: **Buy + MTO + Resupply Lustrador**
+Con la misma ruta: **Dropship** (solo)
 
 ---
 
@@ -234,8 +242,8 @@ Filtrar por categoría "Bases" y "Tapas":
 | Tapa Mármol Carrara 220x100 | Buy + MTO | Marmolería |
 | Tapa Neolith Negro 180x90 | Buy + MTO | Neolith |
 | Tapa Neolith Negro 220x100 | Buy + MTO | Neolith |
-| Tapa Madera Sin Terminar 180x90 | Buy + MTO + Resupply Lustrador | Carpintería |
-| Tapa Madera Sin Terminar 220x100 | Buy + MTO + Resupply Lustrador | Carpintería |
+| Tapa Madera Sin Terminar 180x90 | Dropship | Carpintería |
+| Tapa Madera Sin Terminar 220x100 | Dropship | Carpintería |
 | Tapa Madera Terminada 180x90 (3 var) | Buy + MTO | Lustrador |
 | Tapa Madera Terminada 220x100 (3 var) | Buy + MTO | Lustrador |
 

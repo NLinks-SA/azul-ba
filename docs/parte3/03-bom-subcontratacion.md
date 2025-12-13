@@ -192,19 +192,36 @@ Con estas BoMs configuradas:
    └── Base Acero Negro 180x90
          │
          ▼ (MTO genera POs)
-3. PO a Lustrador (Tapa Terminada)
-   └── Odoo envía: Tapa Sin Terminar
-   └── Lustrador devuelve: Tapa Terminada
-
-4. PO a Metalúrgica (Base)
+3. PO a Lustrador (Tapa Terminada - subcontratación)
+         │
+         ▼ (confirmar PO)
+4. Subcontract MO necesita: Tapa Sin Terminar
+         │
+         ▼ (ruta Dropship del componente)
+5. PO a Carpintería
+         │
+         ▼ (confirmar PO)
+6. DSC Picking (con QC) → Lustrador
+   └── Carpintería envía directo al Lustrador
+         │
+         ▼
+7. PO a Metalúrgica (Base)
    └── Metalúrgica provee: Base completa
          │
          ▼
-5. Recepciones con QC
+8. Recepciones con QC
          │
          ▼
-6. MO puede producirse
+9. MO puede producirse
 ```
+
+!!! info "Dropship Subcontractor"
+    El componente "Tapa Sin Terminar" tiene ruta **Dropship**.
+    Cuando el Lustrador (subcontratista) lo necesita, Odoo:
+
+    1. Crea PO a Carpintería automáticamente
+    2. Genera picking DSC (Dropship Subcontractor)
+    3. El envío va directo Carpintería → Lustrador (sin pasar por stock)
 
 ---
 

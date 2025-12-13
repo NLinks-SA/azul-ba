@@ -24,19 +24,17 @@ En la sección **Warehouse**, activar las siguientes opciones:
 | **Use your own routes** | Habilita rutas personalizadas (Multi-Step Routes) | ☑ Sí |
 
 !!! info "¿Por qué estas opciones?"
-    - **Track product location**: Permite crear ubicaciones específicas (Stock, Input, QC, etc.)
-    - **Use your own routes**: Permite configurar flujos como:
-      - Recepción → Control de Calidad → Stock
-      - Stock → Picking → Packing → Envío
-
-    Sin esto, los productos van directo de recepción a stock.
+    - **Track product location**: Permite crear ubicaciones específicas (Stock, Subcontratación, etc.)
+    - **Use your own routes**: Permite configurar flujos personalizados y ver la ruta Dropship
 
 ### Guardar
 Click en **Guardar** para aplicar los cambios.
 
 ---
 
-## 2.2 Configurar el Almacén
+## 2.2 Configurar el Almacén (Simplificado)
+
+Para esta demo usamos un flujo simplificado de **1 paso**.
 
 ### Ubicación
 ```
@@ -45,26 +43,17 @@ Inventario → Configuración → Almacenes
 
 ### Pasos
 
-1. Click en el almacén principal (ej: "WH" o nombre de tu empresa)
+1. Click en el almacén principal
 2. Configurar:
 
 | Campo | Valor | Descripción |
 |-------|-------|-------------|
-| **Incoming Shipments** | Receive goods in input, then quality and then stock (3 steps) | Input → QC → Stock |
-| **Outgoing Shipments** | Pack goods, send goods in output and then deliver (3 steps) | Pick → Pack → Ship |
+| **Incoming Shipments** | Receive goods directly (1 step) | Directo a Stock |
+| **Outgoing Shipments** | Deliver goods directly (1 step) | Directo desde Stock |
 
-### Resultado
-
-Al guardar, Odoo crea automáticamente estas ubicaciones:
-
-```
-WH/
-├── Input          (Recepción)
-├── Quality Control (Control de Calidad)
-├── Stock          (Almacén principal)
-├── Output         (Salida)
-└── Packing Zone   (Zona de empaque)
-```
+!!! tip "¿Por qué 1 paso?"
+    Para esta demo simplificamos el flujo. El control de calidad se hace
+    en el picking **DSC** (Dropship Subcontractor), no en recepciones normales.
 
 ---
 
@@ -77,50 +66,99 @@ Inventario → Configuración → Ubicaciones
 
 ### ¿Por qué crear estas ubicaciones?
 
-Cada subcontratista necesita una ubicación virtual para:
+Cada subcontratista necesita una ubicación para:
 
 - Rastrear materiales enviados al proveedor
-- Controlar el inventario en tránsito
+- Destino del Dropship Subcontractor (DSC)
+- Control de inventario en tránsito
+
+### Importante: Jerarquía Correcta
+
+!!! warning "Ubicación Padre"
+    Las ubicaciones de subcontratista deben ser hijas de **"Subcontratación"**
+    (no de "Vendors"), para que el Dropship Subcontractor funcione correctamente.
+
+    ```
+    Subcontratación/
+    ├── Subcontract - Carpintería Hnos. García
+    ├── Subcontract - Lustres & Acabados
+    ├── Subcontract - Metalúrgica Precisión
+    ├── Subcontract - Marmolería Del Sur
+    └── Subcontract - Neolith Argentina
+    ```
 
 ### Pasos
 
-1. Click en **Nuevo**
-2. Crear una ubicación por cada subcontratista:
+1. Buscar la ubicación **"Subcontratación"** (creada automáticamente por el módulo mrp_subcontracting)
+2. Click en **Nuevo** para crear cada ubicación de subcontratista:
 
 | Nombre | Tipo | Ubicación Padre |
 |--------|------|-----------------|
-| Subcontract - Carpintería | Interna | Vendors (o Proveedores) |
-| Subcontract - Lustrador | Interna | Vendors |
-| Subcontract - Metalúrgica | Interna | Vendors |
-| Subcontract - Marmolería | Interna | Vendors |
-
-!!! example "Ejemplo de configuración"
-    ```
-    Nombre de ubicación: Subcontract - Carpintería Hnos. García
-    Tipo de ubicación: Interna
-    Ubicación padre: Partners/Vendors
-    ```
+| Subcontract - Carpintería Hnos. García | Interna | Subcontratación |
+| Subcontract - Lustres & Acabados | Interna | Subcontratación |
+| Subcontract - Metalúrgica Precisión | Interna | Subcontratación |
+| Subcontract - Marmolería Del Sur | Interna | Subcontratación |
+| Subcontract - Neolith Argentina | Interna | Subcontratación |
 
 ---
 
-## 2.4 Crear Ubicaciones de Tránsito (Opcional)
+## 2.4 Verificar Picking Type DSC
 
-Si necesitás rastrear envíos entre proveedores:
+Al instalar el módulo `mrp_subcontracting_dropshipping`, se crea automáticamente el Picking Type **DSC** (Dropship Subcontractor).
 
-### Pasos
+### Verificar
 
-1. Crear ubicación padre:
-   ```
-   Nombre: Transit Locations
-   Tipo: Tránsito
-   ```
+```
+Inventario → Configuración → Tipos de operación
+```
 
-2. Crear ubicaciones hijas:
+Buscar:
 
-| Nombre | Tipo | Padre |
-|--------|------|-------|
-| Transit: Carpintería → Lustrador | Tránsito | Transit Locations |
-| Transit: Lustrador → Fábrica | Tránsito | Transit Locations |
+| Nombre | Código | Descripción |
+|--------|--------|-------------|
+| Dropship Subcontractor | DSC | Envío directo de proveedor a subcontratista |
+
+!!! info "¿Qué es el Picking Type DSC?"
+    Es el tipo de operación que se usa cuando un proveedor envía materiales
+    **directamente** a un subcontratista:
+
+    ```
+    Proveedor (Carpintería) ──DSC──► Subcontratista (Lustrador)
+    ```
+
+    - **Origen**: Partners/Vendors (ubicación genérica de proveedores)
+    - **Destino**: Subcontratación (ubicación padre de subcontratistas)
+
+### Verificar Configuración DSC
+
+El Picking Type DSC debe tener:
+
+| Campo | Valor Correcto |
+|-------|----------------|
+| `default_location_dest_id` | Subcontratación (la ubicación padre) |
+
+Esto permite que el destino específico se determine por el `dest_address_id` de la PO
+(la ubicación del subcontratista que necesita el material).
+
+---
+
+## 2.5 Activar Ruta MTO
+
+### Ubicación
+```
+Inventario → Configuración → Rutas
+```
+
+### Verificar Ruta MTO
+
+Buscar la ruta **"Replenish on Order (MTO)"** y verificar:
+
+| Campo | Valor |
+|-------|-------|
+| **Active** | ✅ Sí |
+| **Product Selectable** | ✅ Sí |
+
+Si no está activa, activarla para que los productos puedan usar MTO.
 
 ---
 
@@ -131,66 +169,20 @@ Al finalizar deberías tener:
 ```
 📍 Ubicaciones
 ├── WH/
-│   ├── Input
-│   ├── Quality Control ← Para QC en recepciones
-│   ├── Stock
-│   ├── Output
-│   └── Packing Zone
-├── Partners/Vendors/
-│   ├── Subcontract - Carpintería ← Por subcontratista
-│   ├── Subcontract - Lustrador
-│   └── Subcontract - Metalúrgica
-└── Transit Locations/ (opcional)
-    ├── Transit: Carpintería → Lustrador
-    └── Transit: Lustrador → Fábrica
+│   └── Stock          ← Almacén principal
+├── Subcontratación/   ← Padre de ubicaciones de subcontratistas
+│   ├── Subcontract - Carpintería Hnos. García
+│   ├── Subcontract - Lustres & Acabados
+│   ├── Subcontract - Metalúrgica Precisión
+│   ├── Subcontract - Marmolería Del Sur
+│   └── Subcontract - Neolith Argentina
+└── Partners/Vendors   ← Ubicación genérica de proveedores
+
+📋 Tipos de Operación
+├── Recepciones (WH/IN)
+├── Entregas (WH/OUT)
+└── Dropship Subcontractor (DSC)  ← Para envíos proveedor→subcontratista
 ```
-
----
-
-## 2.5 Crear Ruta "Resupply Lustrador"
-
-Esta ruta es necesaria para que las Tapas de Madera Sin Terminar generen automáticamente una PO a Carpintería cuando se demandan por el Lustrador.
-
-### Ubicación
-```
-Inventario → Configuración → Rutas
-```
-
-### Pasos
-
-1. Click en **Nuevo**
-
-2. Configurar la ruta:
-
-| Campo | Valor |
-|-------|-------|
-| **Nombre** | Resupply Lustrador |
-| **Aplicable en** | ☑ Producto |
-
-3. En la sección **Reglas**, click en **Agregar línea**:
-
-| Campo | Valor |
-|-------|-------|
-| **Acción** | Pull From |
-| **Tipo de operación** | WH: Recepciones |
-| **Ubicación de origen** | Partners/Vendors |
-| **Ubicación de destino** | WH/Stock |
-| **Supply Method** | **Trigger Another Rule** |
-
-!!! warning "Importante: Supply Method"
-    El campo **Supply Method** tiene 3 opciones:
-
-    | Opción | Comportamiento |
-    |--------|----------------|
-    | Take From Stock | Usa stock disponible (MTS) |
-    | **Trigger Another Rule** | Siempre dispara otra regla (MTO puro) ← **Seleccionar esta** |
-    | Take From Stock, if unavailable, Trigger Another Rule | Híbrido MTS/MTO |
-
-    Seleccionar **"Trigger Another Rule"** para que siempre genere automáticamente la PO a Carpintería cuando se demande el producto.
-
-### Guardar
-
-Click en **Guardar**.
 
 ---
 
@@ -199,7 +191,13 @@ Click en **Guardar**.
 | Configuración | Valor |
 |---------------|-------|
 | Multi-Step Routes | ✅ Activado |
-| Almacén - Recepción | 3 pasos (Input → QC → Stock) |
-| Almacén - Envío | 3 pasos (Pick → Pack → Ship) |
-| Ubicaciones subcontratista | Creadas por proveedor |
-| Ruta Resupply Lustrador | ✅ Creada con MTO |
+| Almacén - Recepción | 1 paso (directo) |
+| Almacén - Envío | 1 paso (directo) |
+| Ubicaciones subcontratista | 5 (bajo "Subcontratación") |
+| Picking Type DSC | ✅ Verificado |
+| Ruta MTO | ✅ Activa y seleccionable |
+
+!!! note "Ya no necesitamos Ruta Resupply Lustrador"
+    Con el módulo `mrp_subcontracting_dropshipping`, la ruta **Dropship** en el producto
+    es suficiente. Odoo genera automáticamente el DSC Picking cuando un subcontratista
+    necesita un componente con esa ruta.

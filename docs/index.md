@@ -1,11 +1,11 @@
 # Guía de Implementación Odoo
-## Manufactura con Subcontratación Multietapa + MTO + Calidad
+## Manufactura con Subcontratación + Dropship Subcontractor + MTO + Calidad
 
 Esta guía documenta paso a paso cómo configurar Odoo para un escenario de **manufactura compleja** que incluye:
 
 - ✅ Subcontratación en múltiples etapas
-- ✅ Envíos entre proveedores
-- ✅ Controles de calidad en recepciones y producción
+- ✅ Dropship Subcontractor (envíos directos entre proveedores)
+- ✅ Control de calidad en Dropship Subcontractor
 - ✅ Ensamblado interno
 - ✅ Make to Order (MTO) - Fabricación bajo pedido
 - ✅ Trazabilidad completa
@@ -23,19 +23,20 @@ Una empresa fabrica **Mesas de Comedor Premium** con las siguientes característ
 | **Mesa** | 20 combinaciones válidas | Ensamblado interno |
 | **Terminación** | Sin Terminación, Lustre Mate/Brillante, Natural | Depende del material |
 
-### Flujo especial para Tapas de Madera (con transferencia visible)
+### Flujo especial para Tapas de Madera (Dropship Subcontractor)
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
-│   CARPINTERÍA   │     │   WH/STOCK      │     │     LUSTRADOR       │     │     FÁBRICA     │
-│   (Proveedor A) │────▶│   (Recepción)   │────▶│    (Proveedor B)    │────▶│    (Interno)    │
-└─────────────────┘     └─────────────────┘     └─────────────────────┘     └─────────────────┘
-        │                       │                         │                         │
-   Tapa Madera            Envío a Lustrador         Tapa Madera               Mesa Final
-   SIN Terminar           (Transfer visible)        CON Terminación           Ensamblada
+┌─────────────────┐                      ┌─────────────────────┐     ┌─────────────────┐
+│   CARPINTERÍA   │   Picking: DSC       │     LUSTRADOR       │     │     STOCK       │
+│   Hnos. García  │═════════════════════>│  Lustres & Acabados │────>│   Disponible    │
+│                 │   (dropship + QC)    │                     │     │                 │
+│   Tapa Madera   │                      │   (produce Tapa     │     │   (Tapa         │
+│   SIN Terminar  │   QC al validar →    │    Terminada)       │     │    Terminada)   │
+│                 │   Pass/Fail          │                     │     │                 │
+└─────────────────┘                      └─────────────────────┘     └─────────────────┘
 ```
 
-La transferencia de Stock → Lustrador aparece en **Inventario → Operaciones → Traslados internos**.
+La tapa sin terminar va **directo** de Carpintería al Lustrador (sin pasar por nuestro almacén).
 
 ---
 
@@ -55,25 +56,32 @@ Al finalizar esta configuración, el sistema operará así:
 3. COMPRAS
    └── Se generan POs para componentes
        ├── PO → Metalúrgica (Bases)
-       ├── PO → Lustrador (Tapas Madera)
+       ├── PO → Lustrador (Tapas Madera Terminadas - subcontratación)
        └── PO → Marmolería/Neolith (otras tapas)
           │
-          ▼
-4. RECEPCIONES + QC
-   └── Control de calidad en cada recepción
+          ▼ (al confirmar PO Lustrador)
+4. SUBCONTRACT MO + DROPSHIP
+   └── La PO Lustrador genera Subcontract MO
+       └── Necesita Tapa Sin Terminar (ruta Dropship)
+           └── PO → Carpintería
+               └── DSC Picking (con QC) → Lustrador
           │
           ▼
-5. PRODUCCIÓN
+5. RECEPCIONES + QC
+   └── Control de calidad en DSC Picking
+          │
+          ▼
+6. PRODUCCIÓN
    └── Work Orders de ensamblado
           │
           ▼
-6. ENTREGA
+7. ENTREGA
    └── Despacho al cliente
           │
           ▼
-7. FACTURACIÓN
+8. FACTURACIÓN
    ├── Factura al cliente
-   └── Validación facturas proveedores (3-way + QC)
+   └── Validación facturas proveedores
 ```
 
 ---
