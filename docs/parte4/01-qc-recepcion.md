@@ -50,6 +50,18 @@ Este control se activa al validar el picking DSC con tapas de madera sin termina
 | **Equipo** | Main Quality Team |
 | **Control per** | Product (por producto) |
 | **Control Frequency** | All (todos) |
+| **Measure on** | `move_line` |
+
+!!! info "¿Qué significa `measure_on`?"
+    El campo `measure_on` determina cuándo se crea el Quality Check:
+
+    | Valor | Comportamiento |
+    |-------|---------------|
+    | `product` | Un check por producto en el picking |
+    | `move_line` | Un check por línea de movimiento (más granular) |
+    | `operation` | Un check por operación (para work orders) |
+
+    Para pickings DSC, usamos `move_line` para controlar cada línea individualmente.
 
 ### Instrucciones
 

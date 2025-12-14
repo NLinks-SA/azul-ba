@@ -43,7 +43,49 @@ El proveedor (Lustrador) recibe la tapa sin terminar y la devuelve terminada.
 
 ---
 
-## 3.2 Crear BoM: Base Acero Negro 180x90
+## 3.2 Códigos de BoM con Variantes
+
+Para identificar fácilmente cada BoM, especialmente cuando hay muchas variantes,
+usamos el campo **Código** (Reference) que aparece en el nombre de la BoM.
+
+### Patrón para Tapas Terminadas
+
+```
+TAPA-TERM-{medida}-{terminación}
+```
+
+Ejemplos:
+- `TAPA-TERM-180x90-LUST` (Lustre Mate, 180x90)
+- `TAPA-TERM-180x90-BRIL` (Lustre Brillante, 180x90)
+- `TAPA-TERM-220x100-NATU` (Natural, 220x100)
+
+### Patrón para Mesa
+
+```
+MESA-{material_tapa}-{terminación}-{base}-{medida}
+```
+
+Ejemplos:
+- `MESA-MAD-LUST-ACE-180x90` (Madera, Lustre Mate, Acero Negro, 180x90)
+- `MESA-MAR-SINT-DOE-220x100` (Mármol, Sin Terminación, Acero Dorado, 220x100)
+- `MESA-NEO-SINT-ACE-180x90` (Neolith, Sin Terminación, Acero Negro, 180x90)
+
+### ¿Cómo se ve el código?
+
+El código aparece en el display_name de la BoM:
+
+```
+TAPA-TERM-180x90-LUST: Tapa Madera Terminada 180x90 (Lustre Mate)
+```
+
+Esto facilita:
+- Identificar variantes en listas
+- Buscar BoMs específicas
+- Exportar datos con referencias claras
+
+---
+
+## 3.3 Crear BoM: Base Acero Negro 180x90
 
 ```
 Manufactura → Productos → Listas de materiales → Nuevo
@@ -76,7 +118,30 @@ Dejar **vacío** - el proveedor provee todo el material.
 
 ---
 
-## 3.3 Crear BoM: Tapa Madera Terminada 180x90 (Lustre Mate)
+## 3.4 Mapeo Variante → Componente
+
+Cada variante de Tapa Terminada usa el mismo componente base (Tapa Sin Terminar),
+pero es importante entender el mapeo:
+
+| Variante Tapa Terminada | Componente Requerido |
+|------------------------|---------------------|
+| Tapa Madera Terminada 180x90 (Lustre Mate) | Tapa Madera Sin Terminar 180x90 |
+| Tapa Madera Terminada 180x90 (Lustre Brillante) | Tapa Madera Sin Terminar 180x90 |
+| Tapa Madera Terminada 180x90 (Natural) | Tapa Madera Sin Terminar 180x90 |
+| Tapa Madera Terminada 220x100 (Lustre Mate) | Tapa Madera Sin Terminar 220x100 |
+| Tapa Madera Terminada 220x100 (Lustre Brillante) | Tapa Madera Sin Terminar 220x100 |
+| Tapa Madera Terminada 220x100 (Natural) | Tapa Madera Sin Terminar 220x100 |
+
+!!! tip "Mapeo por Medida"
+    El mapeo es por **medida**, no por terminación:
+    - 180x90 → Tapa Sin Terminar 180x90
+    - 220x100 → Tapa Sin Terminar 220x100
+
+    La terminación es trabajo del Lustrador, no afecta qué componente usamos.
+
+---
+
+## 3.5 Crear BoM: Tapa Madera Terminada 180x90 (Lustre Mate)
 
 Esta BoM sí tiene componentes porque enviamos la tapa sin terminar al lustrador.
 
@@ -86,6 +151,7 @@ Esta BoM sí tiene componentes porque enviamos la tapa sin terminar al lustrador
 |-------|-------|
 | **Producto** | Tapa Madera Terminada 180x90 |
 | **Variante del producto** | Lustre Mate |
+| **Código** | TAPA-TERM-180x90-LUST |
 | **Cantidad** | 1.00 |
 | **Tipo de BoM** | **Subcontratación** |
 
@@ -104,15 +170,16 @@ Esta BoM sí tiene componentes porque enviamos la tapa sin terminar al lustrador
 !!! info "¿Qué pasa con este componente?"
     Cuando se crea una PO al Lustrador, Odoo:
 
-    1. Reserva la Tapa Sin Terminar del stock
-    2. Crea un movimiento de envío al subcontratista
-    3. Al recibir la Tapa Terminada, consume el componente
+    1. Detecta que el componente tiene ruta **Dropship**
+    2. Crea una PO a Carpintería automáticamente
+    3. Genera un picking **DSC** para envío directo Carpintería → Lustrador
+    4. Al validar el DSC (con QC), el componente llega al Lustrador
 
 **Guardar**
 
 ---
 
-## 3.4 Crear las BoMs Restantes
+## 3.6 Crear las BoMs Restantes
 
 ### Bases (sin componentes)
 
@@ -134,7 +201,7 @@ Esta BoM sí tiene componentes porque enviamos la tapa sin terminar al lustrador
 
 ---
 
-## 3.5 BoMs de Subcontratación - Sin Operaciones
+## 3.7 BoMs de Subcontratación - Sin Operaciones
 
 !!! warning "Las BoMs de subcontratación NO llevan operaciones"
     A diferencia de las BoMs de fabricación interna, las BoMs de subcontratación

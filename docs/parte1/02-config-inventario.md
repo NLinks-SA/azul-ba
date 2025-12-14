@@ -87,6 +87,27 @@ Cada subcontratista necesita una ubicación para:
     └── Subcontract - Neolith Argentina
     ```
 
+### Validación Técnica: Jerarquía de Ubicaciones
+
+Para verificar que las ubicaciones están correctamente configuradas:
+
+1. La ubicación padre **"Subcontratación"** debe:
+   - Tener `is_subcontracting_location = True`
+   - Tener `usage = internal`
+
+2. Cada ubicación hija debe:
+   - Tener la ubicación "Subcontratación" como padre (`location_id`)
+   - Heredar automáticamente `is_subcontracting_location = True`
+   - Tener `usage = internal` (no transit)
+
+!!! info "¿Por qué `internal` y no `transit`?"
+    Odoo requiere que las ubicaciones de subcontratación tengan `usage = internal`
+    (no `transit`). Esto permite:
+
+    - Rastrear el inventario exacto en cada subcontratista
+    - Manejar correctamente el consumo de materiales
+    - Aplicar reglas de stock y reordenamiento
+
 ### Pasos
 
 1. Buscar la ubicación **"Subcontratación"** (creada automáticamente por el módulo mrp_subcontracting)
@@ -135,10 +156,35 @@ El Picking Type DSC debe tener:
 
 | Campo | Valor Correcto |
 |-------|----------------|
+| `default_location_src_id` | Partners/Vendors |
 | `default_location_dest_id` | Subcontratación (la ubicación padre) |
+| `code` | `dropship_subcontractor` |
 
 Esto permite que el destino específico se determine por el `dest_address_id` de la PO
 (la ubicación del subcontratista que necesita el material).
+
+### Validación de stock.rule DSC
+
+El módulo `mrp_subcontracting_dropshipping` crea automáticamente una regla de stock
+que conecta la ruta Dropship con el picking type DSC.
+
+Para verificar:
+
+```
+Inventario → Configuración → Reglas de rutas
+```
+
+Buscar la regla con:
+
+| Campo | Valor |
+|-------|-------|
+| **Nombre** | (contiene "DSC" o "Dropship Subcontractor") |
+| **Ruta** | Dropship |
+| **Picking Type** | Dropship Subcontractor |
+| **Acción** | Buy |
+
+Esta regla es **crítica**: sin ella, los productos con ruta Dropship no generarán
+pickings DSC cuando un subcontratista los necesite.
 
 ---
 

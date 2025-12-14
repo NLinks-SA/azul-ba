@@ -10,6 +10,29 @@ Inventario → Productos → Productos
 
 ---
 
+## Resumen de Rutas por Tipo de Componente
+
+Antes de crear los productos, es importante entender qué rutas usar:
+
+| Tipo de Componente | Rutas | ¿Por qué? |
+|-------------------|-------|-----------|
+| Bases (Metalúrgica) | Buy + MTO | Compra normal, genera PO al haber demanda |
+| Tapas Mármol/Neolith | Buy + MTO | Compra normal a proveedor directo |
+| Tapa Madera Sin Terminar | **Solo Dropship** | Va directo de Carpintería → Lustrador (DSC) |
+| Tapa Madera Terminada | Buy + MTO | Subcontratación al Lustrador |
+
+!!! danger "Importante: Tapa Sin Terminar"
+    La Tapa Madera Sin Terminar debe tener **SOLO la ruta Dropship**.
+
+    - ❌ NO agregar Buy
+    - ❌ NO agregar MTO
+    - ❌ NO agregar Resupply
+
+    Si se agregan otras rutas, Odoo puede elegir una ruta con mayor prioridad
+    y el material pasaría por nuestro stock en lugar de ir directo al Lustrador.
+
+---
+
 ## 3.1 Bases Metálicas
 
 Las bases se compran al proveedor Metalúrgica como subcontratación.
