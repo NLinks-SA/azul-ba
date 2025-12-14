@@ -1034,6 +1034,10 @@ for medida in MEDIDAS:
         )
 
         if not existing_bom and lustrador_id:
+            # Generar código de BoM con variante: TAPA-TERM-180x90-MATE
+            term_code = terminacion[:4].upper().replace(' ', '')  # LUST, NATU, etc.
+            bom_code = f"TAPA-TERM-{medida['codigo']}-{term_code}"
+
             bom_id = create('mrp.bom', {
                 'product_tmpl_id': tmpl_id,
                 'product_id': var['id'],
@@ -1041,6 +1045,7 @@ for medida in MEDIDAS:
                 'type': 'subcontract',
                 'subcontractor_ids': [(6, 0, [lustrador_id])],
                 'produce_delay': mat_madera['lead_time_terminacion'],
+                'code': bom_code,
             })
 
             create('mrp.bom.line', {
@@ -1248,6 +1253,12 @@ for variante in mesa_variantes:
         print(f"  ! Componentes no encontrados: {variante['display_name'][:50]}")
         continue
 
+    # Generar código de BoM con variante: MESA-MAD-MATE-ACE-180x90
+    mat_tapa_code = material_tapa[:3].upper()  # MAD, MAR, NEO
+    term_code = terminacion[:4].upper().replace(' ', '') if terminacion != 'Sin Terminación' else 'SINT'
+    mat_base_code = material_base.split()[0][:3].upper()  # ACE, MAD
+    bom_code = f"MESA-{mat_tapa_code}-{term_code}-{mat_base_code}-{medida_codigo}"
+
     bom_id = create('mrp.bom', {
         'product_tmpl_id': mesa_tmpl_id,
         'product_id': variante['id'],
@@ -1255,6 +1266,7 @@ for variante in mesa_variantes:
         'type': 'normal',
         'produce_delay': 1,
         'days_to_prepare_mo': 2,
+        'code': bom_code,
     })
 
     create('mrp.bom.line', {'bom_id': bom_id, 'product_id': tapa_id, 'product_qty': 1})
