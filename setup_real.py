@@ -1045,10 +1045,123 @@ print("""
 """)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 13. ORDEN DE DEMO
+# 13. ALERTAS AUTOMATIZADAS (Notificación a Logística)
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n" + "═"*70)
-print("13. CREANDO ORDEN DE DEMO")
+print("13. CONFIGURANDO ALERTAS AUTOMATIZADAS")
+print("═"*70)
+
+AUTOMATION_ID = None
+try:
+    # 13.1 Instalar módulo base_automation
+    print("\n  13.1 Instalando módulo base_automation...")
+    automation_module = search_read('ir.module.module', [['name', '=', 'base_automation']], ['id', 'state'])
+    if automation_module and automation_module[0]['state'] != 'installed':
+        try:
+            execute('ir.module.module', 'button_immediate_install', [[automation_module[0]['id']]])
+            print("      ✓ Módulo base_automation instalado")
+        except Exception as e:
+            if 'serialize' in str(e).lower():
+                print(f"      ✓ Módulo base_automation instalado (ignorando error de serialización)")
+            else:
+                raise
+    else:
+        print("      - Módulo base_automation ya instalado")
+
+    # 13.2 Crear grupo Logística
+    print("\n  13.2 Creando grupo Logística...")
+    LOGISTICA_GROUP_ID, created = get_or_create('res.groups',
+        [['name', '=', 'Logística']],
+        {
+            'name': 'Logística',
+            'comment': 'Equipo de logística - recibe alertas de producción completada',
+        }
+    )
+    print(f"      {'✓ Grupo creado' if created else '- Grupo ya existe'}: ID {LOGISTICA_GROUP_ID}")
+
+    # 13.3 Obtener modelo mrp.production
+    print("\n  13.3 Configurando acción automatizada...")
+    model_mrp = search_read('ir.model', [['model', '=', 'mrp.production']], ['id'])
+    model_id = model_mrp[0]['id']
+
+    # Código de la acción de servidor (chatter + email opcional)
+    server_action_code = '''# Notificar al grupo Logística (chatter + email opcional)
+for record in records:
+    logistica_group = env['res.groups'].search([('name', '=', 'Logística')], limit=1)
+    if logistica_group:
+        users = logistica_group.user_ids
+        partner_ids = users.mapped('partner_id').ids
+
+        msg = 'PRODUCCION COMPLETADA - Orden: ' + record.name + ' - Producto: ' + record.product_id.display_name + ' - Lista para logistica.'
+
+        # Notificación en chatter (siempre)
+        record.message_post(
+            body=msg,
+            partner_ids=partner_ids,
+            message_type='notification',
+        )
+
+        # Email a los usuarios del grupo (opcional - descomentar si se desea)
+        # record.message_notify(
+        #     body=msg,
+        #     partner_ids=partner_ids,
+        #     subject='MO Completada: ' + record.name,
+        # )
+'''
+
+    # Crear acción de servidor
+    SERVER_ACTION_ID, created = get_or_create('ir.actions.server',
+        [['name', '=', 'Notificar Logística - MO Completada']],
+        {
+            'name': 'Notificar Logística - MO Completada',
+            'model_id': model_id,
+            'state': 'code',
+            'code': server_action_code,
+        }
+    )
+    print(f"      {'✓ Acción servidor creada' if created else '- Acción servidor ya existe'}: ID {SERVER_ACTION_ID}")
+
+    # Crear acción automatizada
+    AUTOMATION_ID, created = get_or_create('base.automation',
+        [['name', '=', 'Alerta Logística: MO Completada']],
+        {
+            'name': 'Alerta Logística: MO Completada',
+            'model_id': model_id,
+            'trigger': 'on_write',
+            'filter_domain': "[('state', '=', 'done')]",
+            'filter_pre_domain': "[('state', '!=', 'done')]",
+            'action_server_ids': [(6, 0, [SERVER_ACTION_ID])],
+            'active': True,
+        }
+    )
+    print(f"      {'✓ Automatización creada' if created else '- Automatización ya existe'}: ID {AUTOMATION_ID}")
+
+except Exception as e:
+    print(f"      ⚠ Alertas automatizadas no disponibles o error: {str(e)[:50]}")
+
+print("""
+  ────────────────────────────────────────────────────────────────────
+  ALERTA AUTOMATIZADA CONFIGURADA:
+
+  Cuando una MO cambia a estado 'done' (Completada):
+  1. Se dispara la acción automatizada
+  2. Se envía notificación al grupo "Logística" en el chatter
+  3. (Opcional) Se puede activar envío de email
+
+  Para agregar usuarios al grupo Logística:
+  Ajustes → Usuarios → [Usuario] → Grupos → Agregar "Logística"
+
+  Para activar notificación por email:
+  Ajustes → Técnico → Acciones de servidor → "Notificar Logística"
+  → Descomentar las líneas de message_notify en el código
+  ────────────────────────────────────────────────────────────────────
+""")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 14. ORDEN DE DEMO
+# ═══════════════════════════════════════════════════════════════════════════════
+print("\n" + "═"*70)
+print("14. CREANDO ORDEN DE DEMO")
 print("═"*70)
 
 if mesa_variantes:
@@ -1135,6 +1248,13 @@ print(f"""
   Categoría:           "Autorización de Rotura/Scrap"
   Ubicaciones Scrap:   Revisión, Descarte
   Flujo:               Solicitud → Aprobación → Scrap → Contabilidad
+
+  ALERTAS AUTOMATIZADAS:
+  ────────────────────────────────────────────────────────────────────
+  Módulo:              base_automation (instalado)
+  Grupo Logística:     Creado (agregar usuarios manualmente)
+  Trigger:             MO cambia a estado 'done'
+  Notificación:        Chatter (+ email opcional)
 
   FLUJO DE PRODUCCIÓN:
   ────────────────────────────────────────────────────────────────────

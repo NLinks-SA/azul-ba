@@ -1,6 +1,6 @@
-# Parte 4: Control de Calidad
+# Parte 4: Control de Calidad y Automatizaciones
 
-En esta sección configuraremos los **Quality Control Points** para automatizar controles de calidad y la **Gestión de Rotura/Scrap** para manejar material dañado con flujo de aprobación.
+En esta sección configuraremos los **Quality Control Points** para automatizar controles de calidad, la **Gestión de Rotura/Scrap** para manejar material dañado con flujo de aprobación, y las **Alertas Automatizadas** para notificar a logística cuando la producción está lista.
 
 ## ¿Qué son los Control Points?
 
@@ -54,3 +54,4 @@ DETECTAR ROTURA → SOLICITUD APROBACIÓN → SUPERVISOR APRUEBA → REGISTRAR S
 1. [Control Points en Recepción](01-qc-recepcion.md)
 2. [Control Points en Manufactura](02-qc-manufactura.md)
 3. [Gestión de Rotura y Scrap](03-gestion-rotura-scrap.md)
+4. [Alertas Automatizadas](04-alertas-automatizadas.md)
