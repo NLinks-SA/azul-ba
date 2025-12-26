@@ -9,6 +9,7 @@ Esta guía documenta paso a paso cómo configurar Odoo para un escenario de **ma
 - ✅ Ensamblado interno
 - ✅ Make to Order (MTO) - Fabricación bajo pedido
 - ✅ Trazabilidad completa
+- ✅ Gestión de rotura/scrap con aprobaciones
 
 ---
 
@@ -120,7 +121,9 @@ Al finalizar esta configuración, el sistema operará así:
 
 - Odoo 17+ (probado en Odoo 19)
 - Acceso de administrador
-- Módulos Enterprise recomendados (Quality)
+- Módulos Enterprise:
+    - **Quality** - Control de calidad
+    - **Approvals** - Flujos de aprobación para rotura/scrap
 
 !!! note "Versión de Odoo"
     Esta guía fue creada para **Odoo 19**, pero los conceptos aplican a versiones 17+.

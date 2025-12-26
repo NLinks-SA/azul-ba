@@ -1,6 +1,6 @@
 # Parte 4: Control de Calidad
 
-En esta sección configuraremos los **Quality Control Points** para automatizar controles de calidad.
+En esta sección configuraremos los **Quality Control Points** para automatizar controles de calidad y la **Gestión de Rotura/Scrap** para manejar material dañado con flujo de aprobación.
 
 ## ¿Qué son los Control Points?
 
@@ -34,7 +34,23 @@ RECEPCIÓN de Tapa Mármol
 
 ---
 
+## Gestión de Rotura/Scrap
+
+Cuando se detecta material dañado, el flujo es:
+
+```
+DETECTAR ROTURA → SOLICITUD APROBACIÓN → SUPERVISOR APRUEBA → REGISTRAR SCRAP
+```
+
+| Ubicación | Uso |
+|-----------|-----|
+| **Revisión** | Material pendiente de evaluar si se puede recuperar |
+| **Descarte** | Material irrecuperable (pérdida contable) |
+
+---
+
 ## Secciones
 
 1. [Control Points en Recepción](01-qc-recepcion.md)
 2. [Control Points en Manufactura](02-qc-manufactura.md)
+3. [Gestión de Rotura y Scrap](03-gestion-rotura-scrap.md)
