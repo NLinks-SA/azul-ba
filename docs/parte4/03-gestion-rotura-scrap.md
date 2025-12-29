@@ -4,6 +4,8 @@
 
 Este documento describe cómo manejar material dañado o roto durante el proceso de producción, utilizando el módulo **Approvals** de Odoo Enterprise para controlar la autorización y el módulo de **Scrap** para registrar las pérdidas.
 
+**El flujo está completamente automatizado**: al aprobar una solicitud de rotura, el sistema crea automáticamente el Scrap y una Orden de Compra para reponer el material.
+
 ---
 
 ## Conceptos Clave
@@ -14,11 +16,11 @@ Este documento describe cómo manejar material dañado o roto durante el proceso
 | **Approval** | Solicitud de autorización que requiere aprobación de un supervisor |
 | **Ubicación Revisión** | Destino temporal para material que podría recuperarse |
 | **Ubicación Descarte** | Destino final para material irrecuperable (pérdida contable) |
-| **should_replenish** | Campo que controla si se repone automáticamente el material |
+| **PO de Reposición** | Orden de compra automática para reponer el material perdido |
 
 ---
 
-## Flujo de Rotura con Autorización
+## Flujo Automatizado de Rotura
 
 ```
 1. OPERARIO DETECTA ROTURA
@@ -26,25 +28,25 @@ Este documento describe cómo manejar material dañado o roto durante el proceso
    ▼
 2. CREA SOLICITUD DE APROBACIÓN
    └─ Categoría: "Autorización de Rotura/Scrap"
-   └─ Incluye: Producto, cantidad, referencia MO/PO, monto pérdida
+   └─ Productos afectados (cantidad, descripción)
+   └─ Referencia MO/PO original
    └─ Estado: PENDING
    │
    ▼
-3. SUPERVISOR REVISA
+3. SUPERVISOR RECIBE NOTIFICACIÓN
    └─ Accede a: Aprobaciones → Solicitudes pendientes
-   └─ Opciones: Aprobar / Rechazar
-   └─ Estado: APPROVED o REFUSED
+   └─ Revisa y Aprueba/Rechaza
    │
    ▼
-4. SI APROBADO → REGISTRAR SCRAP
-   └─ Crear scrap con referencia a MO original
-   └─ Destino: "Revisión" o "Descarte"
-   └─ should_replenish: True/False según decisión
+4. AL APROBAR (AUTOMÁTICO):
+   ├─► Operario recibe notificación
+   ├─► Se crea SCRAP por cada producto (→ ubicación Revisión)
+   └─► Se crea PO de reposición (proveedor default del producto)
    │
    ▼
 5. IMPACTO CONTABLE
-   └─ Movimiento genera asiento de pérdida
-   └─ Valoración del inventario actualizada
+   └─ Scrap genera asiento de pérdida
+   └─ PO repone material automáticamente
 ```
 
 ### Diagrama de Actores
@@ -56,30 +58,26 @@ Detecta rotura
       │
       ▼
 Crea solicitud ──────────► Recibe notificación
-aprobación                        │
+(productos afectados)             │
       │                           ▼
       │                    Revisa y aprueba
       │                           │
-      ◄───────────────────────────┘
+      │                           └──────────────────► AUTOMATICO:
+      │                                                ├─► Crea Scrap
+      │                                                ├─► Crea PO
+      │                                                └─► Asiento contable
+      │
+      ◄───────────────────────────────────────────────── Notificación
       │
       ▼
-Crea Scrap
-→ Revisión
-      │
-      ▼
-(Evaluación técnica)
-      │
-      ▼
-Crea Scrap                                           Registra pérdida
-→ Descarte ──────────────────────────────────────►  Genera reposición
-                                                    Asiento contable
+Verifica Scrap y PO creados
 ```
 
 ### Diagrama de Decisión
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    FLUJO DE ROTURA EN ODOO                      │
+│                FLUJO AUTOMATIZADO DE ROTURA                     │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ROTURA DETECTADA                                               │
@@ -87,28 +85,29 @@ Crea Scrap                                           Registra pérdida
 │        ▼                                                        │
 │  ┌─────────────┐     ┌─────────────┐                           │
 │  │  SOLICITUD  │────►│ SUPERVISOR  │                           │
-│  │  APROBACIÓN │     │  APRUEBA    │                           │
+│  │  APROBACIÓN │     │  REVISA     │                           │
 │  └─────────────┘     └──────┬──────┘                           │
 │                             │                                   │
-│        ┌────────────────────┼────────────────────┐             │
-│        ▼                    ▼                    ▼             │
-│  ┌──────────┐        ┌──────────┐        ┌──────────┐         │
-│  │ REVISIÓN │        │ DESCARTE │        │ RECHAZAR │         │
-│  │(evaluar) │        │(pérdida) │        │(sin acc.)│         │
-│  └────┬─────┘        └────┬─────┘        └──────────┘         │
-│       │                   │                                    │
-│       ▼                   ▼                                    │
-│  ┌──────────┐        ┌──────────┐                              │
-│  │Reproceso │        │ Asiento  │                              │
-│  │o Descarte│        │ Contable │                              │
-│  └──────────┘        │ Pérdida  │                              │
-│                      └────┬─────┘                              │
-│                           │                                    │
-│                           ▼                                    │
-│                    ┌──────────────┐                            │
-│                    │  REPOSICIÓN  │                            │
-│                    │ (nueva PO/MO)│                            │
-│                    └──────────────┘                            │
+│              ┌──────────────┴──────────────┐                   │
+│              ▼                             ▼                   │
+│       ┌──────────┐                  ┌──────────┐               │
+│       │ APRUEBA  │                  │ RECHAZA  │               │
+│       └────┬─────┘                  └────┬─────┘               │
+│            │                             │                      │
+│            ▼ AUTOMÁTICO                  ▼                      │
+│  ┌─────────────────────┐          Notifica al                  │
+│  │ ├─► Crea SCRAP      │          operario                     │
+│  │ │   (→ Revisión)    │          (sin acción)                 │
+│  │ │                   │                                        │
+│  │ ├─► Crea PO         │                                        │
+│  │ │   (reposición)    │                                        │
+│  │ │                   │                                        │
+│  │ └─► Asiento contable│                                        │
+│  │     (pérdida)       │                                        │
+│  └─────────────────────┘                                        │
+│            │                                                    │
+│            ▼                                                    │
+│     Notifica al operario                                        │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```

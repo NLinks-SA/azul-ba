@@ -91,6 +91,45 @@ def get_or_create(model, domain, vals):
     return new_id, True
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 0. INSTALACIÓN DE MÓDULOS REQUERIDOS
+# ═══════════════════════════════════════════════════════════════════════════════
+print("\n" + "═"*70)
+print("0. INSTALANDO MÓDULOS REQUERIDOS")
+print("═"*70)
+
+MODULES_REQUIRED = [
+    'sale_management',
+    'purchase',
+    'mrp',
+    'mrp_subcontracting',
+    'stock',
+    'quality_control',
+    'approvals',
+    'base_automation',
+]
+
+for mod_name in MODULES_REQUIRED:
+    mod = search_read('ir.module.module', [['name', '=', mod_name]], ['id', 'name', 'state'])
+    if mod:
+        m = mod[0]
+        if m['state'] != 'installed':
+            print(f"  Instalando {mod_name}...")
+            try:
+                execute('ir.module.module', 'button_immediate_install', [[m['id']]])
+                print(f"    ✓ {mod_name} instalado")
+            except Exception as e:
+                if 'serialize' in str(e).lower():
+                    print(f"    ✓ {mod_name} instalado (ignorando error de serialización)")
+                else:
+                    print(f"    ⚠ Error instalando {mod_name}: {str(e)[:50]}")
+        else:
+            print(f"  - {mod_name} ya instalado")
+    else:
+        print(f"  ⚠ {mod_name} no encontrado en el sistema")
+
+print("\n  Módulos verificados.")
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURACIÓN REAL - PROVEEDORES
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1044,6 +1083,157 @@ print("""
   ────────────────────────────────────────────────────────────────────
 """)
 
+# 12.4 Crear automatización: Aprobación → Scrap + PO
+print("\n  12.4 Configurando automatización de aprobación...")
+
+try:
+    # Código Python para la acción de servidor
+    scrap_po_action_code = '''# Automatización: Crear Scrap y PO cuando se aprueba rotura
+for record in records:
+    if record.category_id.name != 'Autorización de Rotura/Scrap':
+        continue
+    if not record.product_line_ids:
+        continue
+
+    # Buscar ubicación de scrap (Revisión por defecto, usage=inventory)
+    scrap_location = env['stock.location'].search([
+        ('name', '=', 'Revisión'),
+        ('usage', '=', 'inventory')
+    ], limit=1)
+    if not scrap_location:
+        scrap_location = env['stock.location'].search([('usage', '=', 'inventory')], limit=1)
+
+    # Buscar ubicación de stock
+    stock_location = env['stock.location'].search([
+        ('usage', '=', 'internal'),
+        ('company_id', '=', record.company_id.id)
+    ], limit=1)
+
+    po_lines = []
+    for line in record.product_line_ids:
+        product = line.product_id
+        qty = line.quantity
+        uom = line.product_uom_id or product.uom_id
+
+        # 1. CREAR SCRAP
+        if stock_location and scrap_location:
+            scrap = env['stock.scrap'].create({
+                'product_id': product.id,
+                'scrap_qty': qty,
+                'product_uom_id': uom.id,
+                'location_id': stock_location.id,
+                'scrap_location_id': scrap_location.id,
+                'origin': record.name + ' - ' + (record.reference or ''),
+            })
+            scrap.action_validate()
+
+        # 2. PREPARAR LÍNEA DE PO
+        supplier_info = env['product.supplierinfo'].search([
+            ('product_tmpl_id', '=', product.product_tmpl_id.id)
+        ], limit=1)
+        if supplier_info:
+            po_lines.append({
+                'product': product,
+                'qty': qty,
+                'supplier': supplier_info.partner_id,
+                'price': supplier_info.price,
+                'uom': uom,
+            })
+
+    # 3. CREAR PO agrupando por proveedor
+    suppliers = {}
+    for pl in po_lines:
+        sid = pl['supplier'].id
+        if sid not in suppliers:
+            suppliers[sid] = {'partner': pl['supplier'], 'lines': []}
+        suppliers[sid]['lines'].append(pl)
+
+    for sid, data in suppliers.items():
+        env['purchase.order'].create({
+            'partner_id': sid,
+            'origin': record.name + ' - REPOSICION ROTURA',
+            'order_line': [(0, 0, {
+                'product_id': pl['product'].id,
+                'name': pl['product'].display_name,
+                'product_qty': pl['qty'],
+                'product_uom_id': pl['uom'].id,
+                'price_unit': pl['price'],
+            }) for pl in data['lines']]
+        })
+
+    # Mensaje en chatter
+    msg = 'APROBACION PROCESADA: ' + str(len(record.product_line_ids)) + ' scrap(s)'
+    if suppliers:
+        msg += ' y ' + str(len(suppliers)) + ' PO(s) de reposicion.'
+    else:
+        msg += '. Sin PO (productos sin proveedor).'
+    record.message_post(body=msg)
+'''
+
+    # Obtener modelo approval.request
+    approval_model = search_read('ir.model', [['model', '=', 'approval.request']], ['id'])
+
+    if approval_model:
+        APPROVAL_MODEL_ID = approval_model[0]['id']
+
+        # Crear acción de servidor
+        SCRAP_PO_ACTION_ID, created = get_or_create('ir.actions.server',
+            [['name', '=', 'Crear Scrap y PO desde Aprobación']],
+            {
+                'name': 'Crear Scrap y PO desde Aprobación',
+                'model_id': APPROVAL_MODEL_ID,
+                'state': 'code',
+                'code': scrap_po_action_code,
+            })
+
+        if created:
+            print("      ✓ Acción de servidor 'Crear Scrap y PO' creada")
+        else:
+            print("      - Acción de servidor ya existe")
+
+        # Crear regla de automatización
+        SCRAP_AUTOMATION_ID, created = get_or_create('base.automation',
+            [['name', '=', 'Rotura Aprobada: Crear Scrap y PO']],
+            {
+                'name': 'Rotura Aprobada: Crear Scrap y PO',
+                'model_id': APPROVAL_MODEL_ID,
+                'trigger': 'on_write',
+                'filter_domain': "[('request_status', '=', 'approved'), ('category_id.name', '=', 'Autorización de Rotura/Scrap')]",
+                'filter_pre_domain': "[('request_status', '!=', 'approved')]",
+                'action_server_ids': [(6, 0, [SCRAP_PO_ACTION_ID])],
+            })
+
+        if created:
+            print("      ✓ Automatización 'Rotura Aprobada: Crear Scrap y PO' creada")
+        else:
+            print("      - Automatización ya existe")
+    else:
+        print("      ⚠ Modelo approval.request no encontrado")
+
+except Exception as e:
+    print(f"      ⚠ Error configurando automatización: {str(e)[:80]}")
+
+print("""
+  ────────────────────────────────────────────────────────────────────
+  FLUJO AUTOMATIZADO DE ROTURA/SCRAP:
+
+  1. OPERARIO DETECTA ROTURA
+     └─ Crea solicitud de aprobación con productos afectados
+
+  2. SUPERVISOR RECIBE NOTIFICACIÓN
+     └─ Revisa y aprueba/rechaza
+
+  3. AL APROBAR (AUTOMÁTICO):
+     └─ Se notifica al operario
+     └─ Se crea SCRAP por cada producto (ubicación: Revisión)
+     └─ Se crea PO de reposición (proveedor default del producto)
+
+  4. IMPACTO CONTABLE
+     └─ Scrap genera asiento de pérdida
+     └─ PO repone el material automáticamente
+  ────────────────────────────────────────────────────────────────────
+""")
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 13. ALERTAS AUTOMATIZADAS (Notificación a Logística)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1136,24 +1326,107 @@ for record in records:
     )
     print(f"      {'✓ Automatización creada' if created else '- Automatización ya existe'}: ID {AUTOMATION_ID}")
 
+    # 13.4 Notificación diaria de entregas programadas
+    print("\n  13.4 Configurando notificación diaria de entregas...")
+
+    # Código para el cron de entregas diarias
+    entregas_cron_code = '''# Notificación diaria: Entregas programadas para hoy
+today = datetime.datetime.now().date()
+today_start = datetime.datetime.combine(today, datetime.time.min)
+today_end = datetime.datetime.combine(today, datetime.time.max)
+
+pickings = env['stock.picking'].search([
+    ('picking_type_code', '=', 'outgoing'),
+    ('scheduled_date', '>=', today_start),
+    ('scheduled_date', '<=', today_end),
+    ('state', 'not in', ['done', 'cancel']),
+])
+
+if pickings:
+    lines = ['<h2>ENTREGAS PROGRAMADAS PARA HOY (' + str(today) + ')</h2>', '<ul>']
+
+    for p in pickings:
+        line = '<li><b>' + (p.name or '') + '</b>'
+        line += ' - Cliente: ' + (p.partner_id.name if p.partner_id else 'N/A')
+        line += ' - Origen: ' + (p.origin or 'N/A') + '</li>'
+        lines.append(line)
+
+    lines.append('</ul>')
+    lines.append('<p><b>Total: ' + str(len(pickings)) + ' entrega(s)</b></p>')
+
+    msg = ''.join(lines)
+
+    # Enviar email al grupo Logística
+    logistica_group = env['res.groups'].search([('name', '=', 'Logística')], limit=1)
+    if logistica_group:
+        emails = logistica_group.user_ids.mapped('email')
+        email_to = ','.join([e for e in emails if e])
+        if email_to:
+            mail = env['mail.mail'].create({
+                'subject': 'Entregas del Día: ' + str(today),
+                'body_html': msg,
+                'email_to': email_to,
+                'auto_delete': True,
+            })
+            mail.send()
+'''
+
+    # Obtener modelo stock.picking para la acción
+    model_picking = search_read('ir.model', [['model', '=', 'stock.picking']], ['id'])
+    model_picking_id = model_picking[0]['id'] if model_picking else model_id
+
+    # Crear acción de servidor para entregas diarias
+    ENTREGAS_ACTION_ID, created = get_or_create('ir.actions.server',
+        [['name', '=', 'Notificación Diaria: Entregas del Día']],
+        {
+            'name': 'Notificación Diaria: Entregas del Día',
+            'model_id': model_picking_id,
+            'state': 'code',
+            'code': entregas_cron_code,
+        }
+    )
+    print(f"      {'✓ Acción entregas creada' if created else '- Acción entregas ya existe'}: ID {ENTREGAS_ACTION_ID}")
+
+    # Crear cron para ejecutar diariamente a las 7:00 AM Argentina (10:00 UTC)
+    ENTREGAS_CRON_ID, created = get_or_create('ir.cron',
+        [['name', '=', 'Notificación Entregas del Día']],
+        {
+            'name': 'Notificación Entregas del Día',
+            'model_id': model_picking_id,
+            'state': 'code',
+            'code': 'model.env["ir.actions.server"].browse(' + str(ENTREGAS_ACTION_ID) + ').run()',
+            'interval_number': 1,
+            'interval_type': 'days',
+            'nextcall': '2025-01-01 10:00:00',  # 7:00 AM Argentina
+            'active': True,
+        }
+    )
+    print(f"      {'✓ Cron entregas creado' if created else '- Cron entregas ya existe'}: ID {ENTREGAS_CRON_ID}")
+
 except Exception as e:
     print(f"      ⚠ Alertas automatizadas no disponibles o error: {str(e)[:50]}")
 
 print("""
   ────────────────────────────────────────────────────────────────────
-  ALERTA AUTOMATIZADA CONFIGURADA:
+  ALERTAS AUTOMATIZADAS CONFIGURADAS:
 
-  Cuando una MO cambia a estado 'done' (Completada):
-  1. Se dispara la acción automatizada
-  2. Se envía notificación al grupo "Logística" en el chatter
-  3. (Opcional) Se puede activar envío de email
+  1. ALERTA MO COMPLETADA:
+     Cuando una MO cambia a estado 'done' (Completada):
+     - Se dispara la acción automatizada
+     - Se envía notificación al grupo "Logística" en el chatter
+     - (Opcional) Se puede activar envío de email
+
+  2. NOTIFICACIÓN DIARIA DE ENTREGAS:
+     Todos los días a las 7:00 AM (Argentina):
+     - Se buscan entregas programadas para el día
+     - Se envía email al grupo "Logística" con la lista
+     - Incluye: número de picking, cliente, origen
 
   Para agregar usuarios al grupo Logística:
   Ajustes → Usuarios → [Usuario] → Grupos → Agregar "Logística"
 
-  Para activar notificación por email:
-  Ajustes → Técnico → Acciones de servidor → "Notificar Logística"
-  → Descomentar las líneas de message_notify en el código
+  Para cambiar hora del cron de entregas:
+  Ajustes → Técnico → Acciones programadas → "Notificación Entregas del Día"
   ────────────────────────────────────────────────────────────────────
 """)
 
