@@ -39,6 +39,7 @@ USO:
 import xmlrpc.client
 import sys
 import time
+import base64
 from config import ODOO_URL, ODOO_DB, ODOO_USERNAME, ODOO_PASSWORD
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -327,11 +328,9 @@ CLIENTES = [
 ]
 
 # WORK CENTERS
+# Un solo work center para simplificar Shop Floor (todas las operaciones en secuencia)
 WORK_CENTERS_CONFIG = [
-    {'name': 'Taller Producción', 'code': 'TALLER', 'time_efficiency': 100, 'time_start': 15, 'time_stop': 10},
-    {'name': 'Ensamble Final', 'code': 'ENSAM', 'time_efficiency': 100, 'time_start': 10, 'time_stop': 5},
-    {'name': 'Control de Calidad', 'code': 'QC', 'time_efficiency': 100, 'time_start': 5, 'time_stop': 5},
-    {'name': 'Embalaje', 'code': 'EMBAL', 'time_efficiency': 100, 'time_start': 5, 'time_stop': 5},
+    {'name': 'Producción', 'code': 'PROD', 'time_efficiency': 100, 'time_start': 10, 'time_stop': 5},
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -883,22 +882,30 @@ for variante in mesa_variantes:
     create('mrp.bom.line', {'bom_id': bom_id, 'product_id': tapa_id, 'product_qty': 1})
     create('mrp.bom.line', {'bom_id': bom_id, 'product_id': base_id, 'product_qty': 1})
 
-    # Operaciones
-    for op_name, wc_code, time_cycle in [
-        ('1. Preparación componentes', 'TALLER', 30),
-        ('2. Ensamble tapa + base', 'ENSAM', 60),
-        ('3. Control de calidad', 'QC', 15),
-        ('4. Embalaje', 'EMBAL', 30),
-    ]:
-        wc_id = WORK_CENTERS.get(wc_code)
+    # Operaciones (secuenciales - cada una depende de la anterior)
+    wc_id = WORK_CENTERS.get('PROD')
+    prev_op_id = None
+    for seq, (op_name, time_cycle) in enumerate([
+        ('1. Preparación componentes', 30),
+        ('2. Ensamble tapa + base', 60),
+        ('3. Control de calidad', 15),
+        ('4. Embalaje', 30),
+    ], start=1):
         if wc_id:
-            create('mrp.routing.workcenter', {
+            op_vals = {
                 'bom_id': bom_id,
                 'name': op_name,
                 'workcenter_id': wc_id,
+                'sequence': seq * 10,
                 'time_mode': 'manual',
                 'time_cycle_manual': time_cycle,
-            })
+            }
+            # Agregar dependencia de la operación anterior
+            if prev_op_id:
+                op_vals['blocked_by_operation_ids'] = [(6, 0, [prev_op_id])]
+
+            op_id = create('mrp.routing.workcenter', op_vals)
+            prev_op_id = op_id
 
     boms_creadas += 1
 
@@ -1431,10 +1438,369 @@ print("""
 """)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 14. ORDEN DE DEMO
+# 14. SHOP FLOOR - INSTRUCCIONES, QUALITY POINTS Y DOCUMENTOS
 # ═══════════════════════════════════════════════════════════════════════════════
 print("\n" + "═"*70)
-print("14. CREANDO ORDEN DE DEMO")
+print("14. CONFIGURANDO SHOP FLOOR (Quality Points, Instrucciones, Docs)")
+print("═"*70)
+
+try:
+    # 14.1 Instalar módulo quality_control si no está instalado
+    print("\n  14.1 Verificando módulo quality_control...")
+    quality_module = search_read('ir.module.module', [['name', '=', 'quality_control']], ['id', 'state'])
+    if quality_module and quality_module[0]['state'] != 'installed':
+        try:
+            execute('ir.module.module', 'button_immediate_install', [[quality_module[0]['id']]])
+            print("      ✓ Módulo quality_control instalado")
+        except Exception as e:
+            if 'serialize' in str(e).lower():
+                print("      ✓ Módulo quality_control instalado (ignorando error)")
+            else:
+                raise
+    else:
+        print("      - Módulo quality_control ya instalado")
+
+    # 14.2 Crear Quality Control Points para operaciones
+    print("\n  14.2 Creando Quality Control Points...")
+
+    # Obtener el picking type de recepción
+    picking_type_in = search_read('stock.picking.type', [['code', '=', 'incoming']], ['id'], limit=1)
+    picking_type_in_id = picking_type_in[0]['id'] if picking_type_in else None
+
+    # Quality Points para diferentes operaciones
+    quality_points_config = [
+        {
+            'name': 'Inspección Visual - Recepción Tapas',
+            'title': 'Verificar estado de la tapa',
+            'product_ids': [],  # Se aplicará a categoría
+            'picking_type_ids': [(6, 0, [picking_type_in_id])] if picking_type_in_id else [],
+            'measure_on': 'move_line',
+            'test_type_id': 'instructions',  # Se buscará
+            'note': '''<h3>INSTRUCCIONES DE INSPECCIÓN - TAPAS</h3>
+<ol>
+<li><b>Verificar embalaje</b>: Sin golpes ni roturas en el packaging</li>
+<li><b>Inspeccionar superficie</b>: Sin rayones, manchas o defectos visibles</li>
+<li><b>Verificar dimensiones</b>: Medir largo x ancho con cinta métrica</li>
+<li><b>Verificar espesor</b>: Usar calibre en 3 puntos diferentes</li>
+<li><b>Fotografiar</b>: Tomar foto de la etiqueta y del producto</li>
+</ol>
+<p><b>⚠️ Si detecta defectos, crear Alerta de Calidad inmediatamente.</b></p>''',
+        },
+        {
+            'name': 'Inspección Visual - Recepción Bases',
+            'title': 'Verificar estado de la base metálica',
+            'product_ids': [],
+            'picking_type_ids': [(6, 0, [picking_type_in_id])] if picking_type_in_id else [],
+            'measure_on': 'move_line',
+            'test_type_id': 'instructions',
+            'note': '''<h3>INSTRUCCIONES DE INSPECCIÓN - BASES METÁLICAS</h3>
+<ol>
+<li><b>Verificar soldaduras</b>: Sin poros, grietas o irregularidades</li>
+<li><b>Inspeccionar pintura</b>: Cobertura uniforme, sin burbujas</li>
+<li><b>Verificar nivelación</b>: Apoyar en superficie plana, no debe bailar</li>
+<li><b>Verificar roscas</b>: Probar con tornillo de muestra</li>
+<li><b>Medir altura</b>: Debe coincidir con especificación del pedido</li>
+</ol>
+<p><b>⚠️ Rechazar si hay defectos de soldadura o pintura.</b></p>''',
+        },
+    ]
+
+    # Buscar tipo de test "instructions"
+    test_type_instr = search_read('quality.point.test_type', [['technical_name', '=', 'instructions']], ['id'])
+    test_type_instr_id = test_type_instr[0]['id'] if test_type_instr else None
+
+    # Buscar tipo "passfail" como alternativa
+    if not test_type_instr_id:
+        test_type_pf = search_read('quality.point.test_type', [['technical_name', '=', 'passfail']], ['id'])
+        test_type_instr_id = test_type_pf[0]['id'] if test_type_pf else None
+
+    qp_created = 0
+    if test_type_instr_id and picking_type_in_id:
+        for qp_config in quality_points_config:
+            qp_id, created = get_or_create('quality.point',
+                [['name', '=', qp_config['name']]],
+                {
+                    'name': qp_config['name'],
+                    'title': qp_config['title'],
+                    'picking_type_ids': qp_config['picking_type_ids'],
+                    'measure_on': qp_config['measure_on'],
+                    'test_type_id': test_type_instr_id,
+                    'note': qp_config['note'],
+                    'company_id': 1,
+                }
+            )
+            if created:
+                qp_created += 1
+        print(f"      ✓ {qp_created} Quality Points creados")
+    else:
+        print("      ⚠ No se pudo crear Quality Points (falta test_type o picking_type)")
+
+    # 14.3 Agregar documentos a productos (planos, instrucciones)
+    print("\n  14.3 Agregando documentos a productos...")
+
+    # Buscar una mesa para agregarle documentos
+    mesa_tmpl = search_read('product.template', [['name', 'ilike', 'Mesa Wull']], ['id', 'name'], limit=1)
+
+    docs_created = 0
+    if mesa_tmpl:
+        mesa_tmpl_id = mesa_tmpl[0]['id']
+
+        # Documentos de ejemplo (URLs públicas de ejemplo)
+        documentos = [
+            {
+                'name': 'Plano de Ensamble - Mesa Wull',
+                'type': 'url',
+                'url': 'https://www.odoo.com/documentation/18.0/_static/img/icons/icon.svg',
+                'res_model': 'product.template',
+                'res_id': mesa_tmpl_id,
+                'attached_on_mrp': 'bom',
+            },
+            {
+                'name': 'Instrucciones de Montaje',
+                'type': 'url',
+                'url': 'https://www.odoo.com/documentation/18.0/applications/inventory_and_mrp/manufacturing.html',
+                'res_model': 'product.template',
+                'res_id': mesa_tmpl_id,
+                'attached_on_mrp': 'bom',
+            },
+            {
+                'name': 'Video Tutorial Ensamble',
+                'type': 'url',
+                'url': 'https://www.odoo.com/slides/slide/manufacturing-order-work-order-basics-5960',
+                'res_model': 'product.template',
+                'res_id': mesa_tmpl_id,
+                'attached_on_mrp': 'bom',
+            },
+        ]
+
+        for doc in documentos:
+            try:
+                doc_id, created = get_or_create('product.document',
+                    [['name', '=', doc['name']], ['res_id', '=', doc['res_id']]],
+                    doc
+                )
+                if created:
+                    docs_created += 1
+            except Exception as e:
+                # product.document might not exist in all versions
+                pass
+
+        if docs_created > 0:
+            print(f"      ✓ {docs_created} documentos agregados a {mesa_tmpl[0]['name']}")
+        else:
+            print("      - Documentos ya existen o modelo no disponible")
+
+    # 14.4 Crear Quality Points para operaciones específicas
+    # En Odoo 19, las instrucciones van en Quality Points vinculados a operaciones
+    print("\n  14.4 Creando Quality Points con instrucciones para operaciones...")
+
+    # Generar PDF de instrucciones para Preparación
+    pdf_preparacion = None
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import cm
+        import tempfile
+
+        pdf_path = tempfile.mktemp(suffix='.pdf')
+        c = canvas.Canvas(pdf_path, pagesize=A4)
+        width, height = A4
+
+        c.setFont('Helvetica-Bold', 24)
+        c.drawCentredString(width/2, height - 2*cm, 'PLANO DE ENSAMBLE')
+        c.setFont('Helvetica', 16)
+        c.drawCentredString(width/2, height - 3*cm, 'Mesa Wull Extensible Stone')
+
+        c.setFont('Helvetica-Bold', 14)
+        c.drawString(2*cm, height - 6*cm, 'PASOS DE PREPARACION:')
+
+        c.setFont('Helvetica', 11)
+        instrucciones = [
+            '1. Verificar que la tapa no tenga rayones ni golpes',
+            '2. Colocar la base sobre superficie plana',
+            '3. Alinear la tapa con los puntos de fijacion',
+            '4. Insertar tornillos (8x) con torque de 15 Nm',
+            '5. Verificar estabilidad y nivelacion',
+            '6. Limpiar superficie y aplicar protector'
+        ]
+
+        y = height - 7.5*cm
+        for inst in instrucciones:
+            c.drawString(2.5*cm, y, inst)
+            y -= 0.8*cm
+
+        c.setFont('Helvetica-Bold', 10)
+        c.drawString(2*cm, height - 15*cm, 'IMPORTANTE: Usar guantes y proteccion ocular')
+        c.save()
+
+        with open(pdf_path, 'rb') as f:
+            pdf_preparacion = base64.b64encode(f.read()).decode()
+        print("      ✓ PDF de instrucciones generado")
+    except ImportError:
+        print("      - reportlab no instalado, omitiendo PDF")
+    except Exception as e:
+        print(f"      - Error generando PDF: {e}")
+
+    # Instrucciones detalladas por tipo de operación
+    instrucciones_operacion = {
+        'Preparación': {
+            'title': 'Verificar componentes antes de iniciar',
+            'note': '''<h3>📋 PREPARACIÓN DE COMPONENTES</h3>
+<ul>
+<li>✅ Verificar que todos los componentes estén disponibles</li>
+<li>✅ Revisar el packing list contra la orden</li>
+<li>✅ Inspeccionar visualmente cada componente</li>
+<li>✅ Preparar herramientas necesarias</li>
+<li>✅ Limpiar área de trabajo</li>
+</ul>
+<p><b>Tiempo estimado: 30 minutos</b></p>''',
+            'worksheet_document': pdf_preparacion,
+        },
+        'Ensamble': {
+            'title': 'Instrucciones de ensamble',
+            'note': '''<h3>🔧 ENSAMBLE TAPA + BASE</h3>
+<ol>
+<li><b>Posicionar base</b>: Colocar base invertida sobre superficie acolchada</li>
+<li><b>Alinear tapa</b>: Centrar tapa sobre la base usando marcas guía</li>
+<li><b>Atornillar</b>: Torque 25 Nm, secuencia estrella</li>
+<li><b>Verificar</b>: Comprobar que no queden tornillos flojos</li>
+<li><b>Voltear</b>: Con cuidado, dar vuelta la mesa</li>
+</ol>
+<p><b>⚠️ No forzar si no alinea</b></p>''',
+        },
+        'Control': {
+            'title': 'Checklist de calidad final',
+            'note': '''<h3>🔍 CONTROL DE CALIDAD FINAL</h3>
+<ul>
+<li>□ Estabilidad - No debe balancearse</li>
+<li>□ Superficie - Sin rayones ni manchas</li>
+<li>□ Uniones - Sin gaps visibles</li>
+<li>□ Tornillos - Todos ajustados</li>
+<li>□ Limpieza - Sin residuos</li>
+</ul>
+<p><b>📸 OBLIGATORIO: Tomar foto del producto terminado</b></p>''',
+        },
+        'Embalaje': {
+            'title': 'Instrucciones de embalaje',
+            'note': '''<h3>📦 EMBALAJE PARA ENVÍO</h3>
+<ol>
+<li><b>Protección esquinas</b>: Foam en las 4 esquinas</li>
+<li><b>Film protector</b>: Envolver superficie</li>
+<li><b>Cartón</b>: Corrugado en todos los lados</li>
+<li><b>Zuncho</b>: 2 zunchos cruzados</li>
+<li><b>Etiqueta</b>: Datos cliente + FRÁGIL</li>
+</ol>''',
+        },
+    }
+
+    # Buscar operaciones y crear Quality Points vinculados
+    operaciones = search_read('mrp.routing.workcenter', [], ['id', 'name'])
+    ops_qp_created = 0
+
+    for op in operaciones:
+        for key, config in instrucciones_operacion.items():
+            if key.lower() in op['name'].lower():
+                qp_name = f"Instrucciones: {op['name']}"
+                qp_vals = {
+                    'name': qp_name,
+                    'title': config['title'],
+                    'measure_on': 'operation',
+                    'operation_id': op['id'],
+                    'test_type_id': test_type_instr_id,
+                    'note': config['note'],
+                    'company_id': 1,
+                }
+                # Agregar PDF si está disponible (visor nativo de Odoo)
+                if config.get('worksheet_document'):
+                    qp_vals['worksheet_document'] = config['worksheet_document']
+
+                qp_id, created = get_or_create('quality.point',
+                    [['name', '=', qp_name]],
+                    qp_vals
+                )
+                if created:
+                    ops_qp_created += 1
+                break
+
+    print(f"      ✓ {ops_qp_created} Quality Points para operaciones creados")
+
+    # 14.5 Crear Quality Points adicionales (foto, etc.)
+    print("\n  14.5 Creando Quality Points adicionales...")
+
+    # Buscar test types
+    test_type_picture = search_read('quality.point.test_type', [['technical_name', '=', 'picture']], ['id'])
+    test_type_picture_id = test_type_picture[0]['id'] if test_type_picture else None
+
+    # Buscar operación de ensamble para agregar foto
+    op_ensamble = search_read('mrp.routing.workcenter', [['name', 'ilike', 'ensamble']], ['id'], limit=1)
+
+    wo_qp_created = 0
+
+    if op_ensamble and test_type_picture_id:
+        # QP para tomar foto antes de ensamblar
+        qp_id, created = get_or_create('quality.point',
+            [['name', '=', 'Foto Pre-Ensamble']],
+            {
+                'name': 'Foto Pre-Ensamble',
+                'title': 'Fotografiar componentes antes de ensamblar',
+                'measure_on': 'operation',
+                'operation_id': op_ensamble[0]['id'],
+                'test_type_id': test_type_picture_id,
+                'note': '<p>📸 Tomar foto de los componentes organizados ANTES de comenzar el ensamble.</p>',
+                'company_id': 1,
+            }
+        )
+        if created:
+            wo_qp_created += 1
+
+    # Buscar operación de QC para agregar checklist passfail
+    op_qc = search_read('mrp.routing.workcenter', [['name', 'ilike', 'control']], ['id'], limit=1)
+    test_type_passfail = search_read('quality.point.test_type', [['technical_name', '=', 'passfail']], ['id'])
+    test_type_passfail_id = test_type_passfail[0]['id'] if test_type_passfail else None
+
+    if op_qc and test_type_passfail_id:
+        qp_id, created = get_or_create('quality.point',
+            [['name', '=', 'Verificación Final Pass/Fail']],
+            {
+                'name': 'Verificación Final Pass/Fail',
+                'title': 'Aprobar o rechazar producto',
+                'measure_on': 'operation',
+                'operation_id': op_qc[0]['id'],
+                'test_type_id': test_type_passfail_id,
+                'note': '<p>Verificar todos los puntos anteriores. Si todo OK → Pass. Si hay defectos → Fail y crear Alerta.</p>',
+                'company_id': 1,
+            }
+        )
+        if created:
+            wo_qp_created += 1
+
+    print(f"      ✓ {wo_qp_created} Quality Points adicionales creados")
+
+except Exception as e:
+    print(f"      ⚠ Error en configuración Shop Floor: {str(e)[:80]}")
+
+print("""
+  ────────────────────────────────────────────────────────────────────
+  SHOP FLOOR CONFIGURADO:
+
+  ✓ Quality Points para recepción (tapas, bases)
+  ✓ Documentos/planos en productos (Mesa Wull)
+  ✓ Instrucciones detalladas en operaciones de BoM
+  ✓ Quality checks en Work Orders (foto, checklist)
+
+  Para probar Shop Floor:
+  1. Ir a Fabricación → Shop Floor
+  2. O acceder desde tablet: /odoo/shop-floor
+
+  Las instrucciones aparecerán automáticamente en cada paso.
+  ────────────────────────────────────────────────────────────────────
+""")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 15. ORDEN DE DEMO
+# ═══════════════════════════════════════════════════════════════════════════════
+print("\n" + "═"*70)
+print("15. CREANDO ORDEN DE DEMO")
 print("═"*70)
 
 if mesa_variantes:
